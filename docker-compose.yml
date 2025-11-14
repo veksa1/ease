@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - REACT_APP_ENVIRONMENT=${REACT_APP_ENVIRONMENT:-development}
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # Future backend service (uncomment when ready)
+  backend:
+    # image: your-backend-image:latest
+    # build: ../backend  # Path to your backend Dockerfile
+    image: nginx:alpine  # Placeholder - replace with your actual backend
+    ports:
+      - "8000:80"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - app-network
+    # volumes:
+    #   - ./backend:/app
+    # command: ["echo", "Backend service placeholder"]
+
+  # Optional: Database service
+  # database:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: ${DB_NAME:-myapp}
+  #     POSTGRES_USER: ${DB_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data:

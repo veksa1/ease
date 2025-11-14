@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Ease UI Typography Tokens */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size: 16px;
+  
+  /* Display: 32/40 semibold */
+  --text-display: 32px;
+  --leading-display: 40px;
+  --weight-display: 600;
+  
+  /* H1: 24/32 semibold */
+  --text-h1: 24px;
+  --leading-h1: 32px;
+  --weight-h1: 600;
+  
+  /* H2: 20/28 semibold */
+  --text-h2: 20px;
+  --leading-h2: 28px;
+  --weight-h2: 600;
+  
+  /* Body: 16/24 regular */
+  --text-body: 16px;
+  --leading-body: 24px;
+  --weight-body: 400;
+  
+  /* Label: 14/20 medium */
+  --text-label: 14px;
+  --leading-label: 20px;
+  --weight-label: 500;
+  
+  /* Ease UI Colors - Light Mode */
+  --primary: #6A67D8;
+  --primary-700: #4E4AB3;
+  --primary-foreground: #ffffff;
+  
+  --neutral-900: #0F172A;
+  --neutral-600: #475569;
+  --neutral-200: #E2E8F0;
+  
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #ffffff;
+  --card-foreground: #0F172A;
+  
+  --success: #22A699;
+  --success-foreground: #ffffff;
+  --warning: #E3A008;
+  --warning-foreground: #ffffff;
+  --critical: #D6455D;
+  --critical-foreground: #ffffff;
+  
+  --accent: #2CB1B5;
+  --accent-foreground: #ffffff;
+  
+  --muted: #F8FAFC;
+  --muted-foreground: #475569;
+  
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --input-background: #ffffff;
+  
+  /* Radius */
+  --radius-card: 12px;
+  --radius-input: 8px;
+  --radius-fab: 24px;
+  --radius: 8px;
+  
+  /* Elevation */
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  
+  /* Charts */
+  --chart-1: #6A67D8;
+  --chart-2: #2CB1B5;
+  --chart-3: #22A699;
+  --chart-4: #E3A008;
+  --chart-5: #D6455D;
+  
+  --popover: #ffffff;
+  --popover-foreground: #0F172A;
+  --secondary: #E2E8F0;
+  --secondary-foreground: #0F172A;
+  --destructive: #D6455D;
+  --destructive-foreground: #ffffff;
+  --ring: #6A67D8;
+}
+
+.dark {
+  /* Ease UI Colors - Dark Mode */
+  --background: #0B1023;
+  --foreground: #E6EAF2;
+  --card: #111A33;
+  --card-foreground: #E6EAF2;
+  
+  --neutral-900: #E6EAF2;
+  --neutral-600: #8B96AC;
+  --neutral-200: #1F2A44;
+  
+  --border: #1F2A44;
+  --input: #1F2A44;
+  --input-background: #111A33;
+  
+  --muted: #111A33;
+  --muted-foreground: #8B96AC;
+  
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  
+  --popover: #111A33;
+  --popover-foreground: #E6EAF2;
+  --secondary: #1F2A44;
+  --secondary-foreground: #E6EAF2;
+  --ring: #6A67D8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-700: var(--primary-700);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-critical: var(--critical);
+  --color-critical-foreground: var(--critical-foreground);
+  --color-neutral-900: var(--neutral-900);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-200: var(--neutral-200);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: var(--radius-input);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-fab);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family);
+  }
+}
+
+/**
+ * Ease UI Base Typography
+ */
+@layer base {
+  .text-display {
+    font-size: var(--text-display);
+    line-height: var(--leading-display);
+    font-weight: var(--weight-display);
+  }
+
+  h1, .text-h1 {
+    font-size: var(--text-h1);
+    line-height: var(--leading-h1);
+    font-weight: var(--weight-h1);
+  }
+
+  h2, .text-h2 {
+    font-size: var(--text-h2);
+    line-height: var(--leading-h2);
+    font-weight: var(--weight-h2);
+  }
+
+  p, .text-body {
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    font-weight: var(--weight-body);
+  }
+
+  label, .text-label {
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    font-weight: var(--weight-label);
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Accessible Switch Animations */
+@layer utilities {
+  .switch-thumb-shadow {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .switch-thumb-shadow-hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Ensure high contrast for switch OFF states */
+  @media (prefers-contrast: high) {
+    [data-state="unchecked"] {
+      border: 2px solid currentColor !important;
+    }
+  }
+}
