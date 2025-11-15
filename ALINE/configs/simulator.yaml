@@ -1,0 +1,80 @@
+# ALINE Migraine Simulator Configuration
+# Ticket 004 - Bayesian / Markov Simulator for Synthetic Migraine Episodes
+
+# Dataset parameters
+n_users: 10000  # Number of synthetic users (reduced for faster testing)
+horizon: 365  # Days to simulate per user
+train_split: 0.8  # Train/val split ratio
+random_seed: 42
+
+# Latent state dimensions: [stress, sleepDebt, hormonal, envLoad]
+latent_dim: 4
+
+# State transition matrix (A): Z_{t+1} = A @ Z_t + B @ u_t + noise
+# Controls temporal dynamics and autoregressive behavior
+state_transition_matrix:  # 4x4 matrix
+  - [0.7, 0.1, 0.05, 0.05]   # stress persistence + cross-effects
+  - [0.15, 0.65, 0.05, 0.1]  # sleepDebt persistence
+  - [0.05, 0.05, 0.8, 0.05]  # hormonal persistence
+  - [0.1, 0.05, 0.05, 0.75]  # environmental load persistence
+
+# Input matrix (B): maps observable features to latent state changes
+# Shape: 4 x n_features (4 x 21)
+input_matrix:  # categorical mappings
+  stress_features: [0, 3, 4, 5]  # feature indices that affect stress
+  sleep_features: [0, 1, 2]  # feature indices that affect sleepDebt
+  hormonal_features: [15, 16]  # feature indices that affect hormonal
+  env_features: [12, 13, 14]  # feature indices that affect envLoad
+  
+# Feature weights for input matrix (reduced to prevent accumulation)
+input_weights:
+  stress: 0.01
+  sleep: 0.01
+  hormonal: 0.008
+  environmental: 0.005
+
+# Process noise (η_t ~ N(0, Σ))
+process_noise:
+  stress: 0.15
+  sleepDebt: 0.12
+  hormonal: 0.10
+  envLoad: 0.08
+
+# Migraine probability logistic model: p = 1/(1+exp(-(w@Z+b)))
+migraine_model:
+  weights: [0.5, 0.4, 0.45, 0.35]  # [stress, sleepDebt, hormonal, envLoad]
+  bias: -1.8  # Adjusted to achieve ~15% baseline migraine rate
+  
+# Baseline migraine rate (empirical)
+baseline_migraine_rate: 0.15  # ~15% of days have migraines
+
+# Data paths
+paths:
+  priors: data/priors.yaml
+  feature_metadata: data/migraine_features_augmented.csv
+  output_train: data/synthetic_migraine_train.csv
+  output_val: data/synthetic_migraine_val.csv
+  output_meta: data/synthetic_migraine_meta.json
+
+# Feature order (must match CSV column order)
+feature_order:
+  - Sleep Duration (hours)
+  - Sleep Quality (1-10)
+  - Sleep Consistency Score
+  - Stress Level (1-10)
+  - Work Hours
+  - Anxiety Score (1-10)
+  - Caffeine Intake (mg)
+  - Water Intake (L)
+  - Meal Regularity (1-10)
+  - Exercise Duration (min)
+  - Physical Activity Level (1-10)
+  - Neck Tension (1-10)
+  - Screen Time (hours)
+  - Weather Pressure (hPa)
+  - Noise Level (dB)
+  - Hormone Fluctuation Index
+  - Menstrual Cycle Day
+  - Alcohol Consumption (units)
+  - Smoking (cigarettes/day)
+  - Meditation Time (min)

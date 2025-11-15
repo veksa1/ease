@@ -1,0 +1,16 @@
+.python-version
+__pycache__/
+*.pyc
+.env
+.vscode/
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+*.sqlite3
+ALINE/tickets/
+*.xlsx
+*.csv
+*.json
+*.pkl
