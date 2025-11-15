@@ -6,17 +6,21 @@
  */
 
 /**
- * QuickCheck data structure (simplified)
+ * QuickCheck data structure (updated for DS4)
+ * Supports both old and new formats for backwards compatibility
  */
 export interface QuickCheckData {
   caffeine: {
-    level: 'none' | 'normal' | 'lot';
+    level: 'none' | 'some' | 'lot' | 'normal' | null; // 'normal' kept for backwards compat
+    types?: string[];
+    lastIntake?: string;
   };
   water: {
-    amount: 'none' | 'low' | 'medium' | 'high';
+    amount: 'none' | 'low' | 'medium' | 'high' | null;
   };
   food: {
-    level: number; // 1-10
+    level: number; // 0-10
+    note?: string;
   };
   sleep?: {
     hours: number;
@@ -34,12 +38,14 @@ export interface QuickCheckData {
 export function quickCheckToRiskAdjustment(checkData: QuickCheckData): number {
   let adjustment = 0;
 
-  // Caffeine impact
-  if (checkData.caffeine?.level === 'lot') {
+  // Caffeine impact (handle both 'normal' and 'some' for backwards compatibility)
+  const caffeineLevel = checkData.caffeine?.level;
+  if (caffeineLevel === 'lot') {
     adjustment += 0.05; // +5% risk
-  } else if (checkData.caffeine?.level === 'none') {
+  } else if (caffeineLevel === 'none') {
     adjustment -= 0.02; // -2% risk (if user usually has caffeine, withdrawal)
   }
+  // 'normal' or 'some' = neutral impact (0)
 
   // Hydration impact
   if (checkData.water?.amount === 'none' || checkData.water?.amount === 'low') {
