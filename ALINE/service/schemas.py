@@ -114,3 +114,46 @@ class ContextGenerationResponse(BaseModel):
     posteriors: dict = Field(..., description="Updated posterior distributions")
     features: List[dict] = Field(..., description="Feature details with prior/posterior")
     timestamp: str
+
+
+# ============================================================================
+# FEEDBACK LOOP SCHEMAS (Ticket 026)
+# ============================================================================
+
+class FeedbackRequest(BaseModel):
+    """Request to submit migraine outcome feedback"""
+    user_id: str = Field(..., description="User ID")
+    date: str = Field(..., description="Date in YYYY-MM-DD format")
+    had_migraine: bool = Field(..., description="Whether migraine occurred")
+    severity: Optional[int] = Field(None, description="Severity 1-10 if migraine occurred")
+    notes: Optional[str] = Field(None, description="Optional user notes")
+
+
+class FeedbackResponse(BaseModel):
+    """Response after submitting feedback"""
+    success: bool
+    message: str
+    updated_accuracy: float
+    num_feedback_points: int
+
+
+class AccuracyResponse(BaseModel):
+    """Response with user's prediction accuracy"""
+    accuracy: float
+    num_predictions: int
+    window_days: int
+    confidence: str  # "low", "medium", "high"
+
+
+class FeedbackHistoryItem(BaseModel):
+    """Single feedback history item"""
+    feedback_date: str
+    predicted_risk: Optional[float]
+    actual_outcome: bool
+    severity: Optional[int]
+    correct: Optional[bool]
+
+
+class FeedbackHistoryResponse(BaseModel):
+    """Response with feedback history"""
+    history: List[FeedbackHistoryItem]
