@@ -1,0 +1,29 @@
+# ALINE Model Configuration - Ticket 005
+# Hyperparameters for the simplified ALINE model
+
+# Input dimension (number of normalized features per hour)
+# This should match the number of features in the normalized data
+in_dim: 20  # 20 features from priors.yaml
+
+# Latent dimension (latent state variables)
+# stress, sleepDebt, hormonal, envLoad
+z_dim: 4
+
+# Transformer model dimension
+d_model: 64
+
+# Number of attention heads
+nhead: 4
+
+# Number of transformer encoder layers
+nlayers: 3
+
+# Sequence length (rolling daily windows)
+# 24 hours of hourly data
+sequence_length: 24
+
+# Batch size for training
+batch_size: 32
+
+# Model save path
+save_path: runs/checkpoints/best.pt
