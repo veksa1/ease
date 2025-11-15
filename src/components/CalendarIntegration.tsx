@@ -196,9 +196,18 @@ export function CalendarIntegration({ userId, onClose }: CalendarIntegrationProp
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-900 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-900 text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium mb-1">Connection Failed</p>
+                <p className="text-red-800">{error}</p>
+                {error.includes('Network') && (
+                  <p className="text-red-700 mt-2 text-xs">
+                    💡 <strong>Tip:</strong> Make sure the calendar URL is public and accessible. 
+                    For Google Calendar, ensure &quot;Make available to public&quot; is enabled in sharing settings.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

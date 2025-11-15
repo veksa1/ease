@@ -64,3 +64,4 @@ configs/local*
 node_modules
 .vercel
 .env
+src/utils/env.ts

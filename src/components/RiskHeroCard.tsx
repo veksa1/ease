@@ -30,7 +30,6 @@ export function RiskHeroCard({
   whatHelps = [],
   lowStimulationMode = false,
 }: RiskHeroCardProps) {
-  const [timeHorizon, setTimeHorizon] = useState<'6h' | 'today'>('6h');
   const [showDetails, setShowDetails] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(
     typeof window !== 'undefined' ? window.innerWidth : 375
@@ -85,7 +84,7 @@ export function RiskHeroCard({
     personal: '👤 Personal',
   };
 
-  const defaultOpenCategories = Object.keys(groupedContributors) as string[];
+  const defaultOpenCategories: string[] = [];
 
   const getGradientClasses = () => {
     if (riskLevel === 'low') {
@@ -109,29 +108,6 @@ export function RiskHeroCard({
           transform: 'translate(-30%, -30%)',
         }}
       />
-
-      <div className="absolute top-4 right-4 z-10">
-        <div className="flex gap-1 p-0.5 rounded-full bg-card/60 backdrop-blur-sm border border-border/40">
-          <button
-            onClick={() => setTimeHorizon('6h')}
-            className={`px-3 py-1.5 rounded-full text-label transition-all ${
-              timeHorizon === '6h' ? 'bg-primary/10 text-primary-600 dark:text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{ minWidth: '44px', minHeight: '32px' }}
-          >
-            6h
-          </button>
-          <button
-            onClick={() => setTimeHorizon('today')}
-            className={`px-3 py-1.5 rounded-full text-label transition-all ${
-              timeHorizon === 'today' ? 'bg-primary/10 text-primary-600 dark:text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{ minWidth: '44px', minHeight: '32px' }}
-          >
-            Today
-          </button>
-        </div>
-      </div>
 
       <div className="relative z-10 flex flex-col items-center space-y-3 md:space-y-4">
         <GradientRiskGauge
@@ -157,7 +133,7 @@ export function RiskHeroCard({
       {showDetails && (
         <div className="fixed inset-0 z-50 bg-background text-foreground flex flex-col">
           <div className="flex-shrink-0 border-b border-border/60 bg-background/80 backdrop-blur">
-            <div className="mx-auto max-w-5xl h-12 md:h-14 px-2 md:px-3 flex items-center gap-3">
+            <div className="mx-auto max-w-5xl h-12 md:h-14 px-2 md:px-3 flex items-center">
               <button
                 onClick={() => setShowDetails(false)}
                 className="flex items-center justify-center w-9 h-9 rounded-full bg-muted hover:bg-muted/80 transition-colors"
@@ -165,10 +141,11 @@ export function RiskHeroCard({
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="flex items-baseline gap-3">
+              <div className="flex-1 flex flex-col items-center">
                 <h2 className="text-base md:text-lg font-semibold">Your risk factors</h2>
                 <span className="text-xs md:text-sm text-muted-foreground">All current factors and their influence</span>
               </div>
+              <div className="w-9"></div>
             </div>
           </div>
 
@@ -192,7 +169,7 @@ export function RiskHeroCard({
                             <div className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-md bg-card/80 shadow-sm flex-shrink-0">
                               <HelpCircle className="w-4 h-4 text-muted-foreground" />
                             </div>
-                            <span className="text-sm md:text-base font-medium whitespace-nowrap">{variable.name}</span>
+                            <span className="text-sm md:text-base font-medium whitespace-nowrap text-foreground">{variable.name}</span>
                             <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">
                               {variable.value}{variable.unit ? ` ${variable.unit}` : ''}
                             </span>
@@ -200,7 +177,7 @@ export function RiskHeroCard({
                               className={`inline-flex items-center justify-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-md shadow-sm ${getPercentageBadgeColor(variable.percentage)}`}
                               style={{ borderRadius: '8px', minWidth: '56px' }}
                             >
-                              <span className={`text-xs md:text-sm font-semibold ${getInfluenceColor(variable.percentage)}`}>
+                              <span className="text-xs md:text-sm font-semibold">
                                 {variable.percentage}%
                               </span>
                             </span>

@@ -18,10 +18,13 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
-import { DemoResetButton } from './components/DemoResetButton';
+import { RiskVariable } from './types';
+import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDetailsStep';
+import type { PersonalMigraineProfile } from './types';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
+  const [sootheModeData, setSootheModeData] = useState<{ riskVariables: RiskVariable[], riskPercentage: number } | null>(null);
   
   // Check if user has seen onboarding
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
@@ -72,6 +75,8 @@ export default function App() {
     whoop: { connected: false, lastSync: undefined },
   });
 
+  const [personalProfile, setPersonalProfile] = useState<PersonalMigraineProfile | null>(null);
+
   const handleConsentChange = (key: keyof typeof consents) => (checked: boolean) => {
     setConsents(prev => ({ ...prev, [key]: checked }));
   };
@@ -88,14 +93,14 @@ export default function App() {
 
   // Onboarding navigation
   const handleOnboardingNext = () => {
-    if (onboardingStep === 1) {
-      setOnboardingStep(2);
+    if (currentScreen === 'onboarding-1') {
       setCurrentScreen('onboarding-2');
-    } else if (onboardingStep === 2) {
-      setOnboardingStep(3);
+    } else if (currentScreen === 'onboarding-2') {
       setCurrentScreen('onboarding-3');
-    } else if (onboardingStep === 3) {
-      setCurrentScreen('connect-devices');
+    } else if (currentScreen === 'onboarding-3') {
+      setCurrentScreen('onboarding-4');
+    } else if (currentScreen === 'onboarding-4') {
+      // no-op: final step handled inside OnboardingPersonalDetailsStep
     }
   };
 
@@ -119,20 +124,8 @@ export default function App() {
       {currentScreen === 'onboarding-1' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={1} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={1} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6">
@@ -214,20 +207,8 @@ export default function App() {
       {currentScreen === 'onboarding-2' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={2} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={2} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
@@ -318,20 +299,8 @@ export default function App() {
       {currentScreen === 'onboarding-3' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={3} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={3} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
@@ -400,10 +369,31 @@ export default function App() {
                   className="w-full h-12"
                   style={{ borderRadius: '12px' }}
                 >
-                  Agree and continue
+                  Continue
                 </Button>
               </div>
             </div>
+          </main>
+        </>
+      )}
+
+      {currentScreen === 'onboarding-4' && (
+        <>
+          <header className="px-6 pt-6 pb-4">
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={4} totalSteps={4} />
+            </div>
+          </header>
+          <main className="flex-1 px-6 pb-6 overflow-y-auto">
+            <OnboardingPersonalDetailsStep
+              initialValue={personalProfile || undefined}
+              onBack={() => setCurrentScreen('onboarding-3')}
+              onSubmit={async (profile) => {
+                await sqliteService.savePersonalMigraineProfile(profile);
+                setPersonalProfile(profile);
+                setCurrentScreen('home');
+              }}
+            />
           </main>
         </>
       )}
@@ -529,9 +519,9 @@ export default function App() {
       {/* Main App Screens */}
       {currentScreen.startsWith('quick-check') && (
         <QuickCheckFlow
-          onComplete={(data) => {
-            // Update risk with QuickCheck data
-            updateRiskWithQuickCheck(data);
+          onComplete={async (data) => {
+            // Update risk with QuickCheck data and fetch hourly posterior
+            await updateRiskWithQuickCheck(data);
             
             // Increment and save streak
             const newStreak = streakCount + 1;
@@ -570,7 +560,17 @@ export default function App() {
       )}
 
       {currentScreen === 'soothe-mode' && (
-        <SootheMode onClose={() => setCurrentScreen('home')} />
+        sootheModeData ? (
+          <SootheMode 
+            onClose={() => setCurrentScreen('home')}
+            riskVariables={sootheModeData.riskVariables}
+            riskPercentage={sootheModeData.riskPercentage}
+          />
+        ) : (
+          <div className="flex items-center justify-center min-h-screen bg-background">
+            <p className="text-body text-muted-foreground">Loading personalized instructions...</p>
+          </div>
+        )
       )}
 
       {currentScreen === 'home' && (
@@ -578,7 +578,10 @@ export default function App() {
           <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
-            onSootheModeClick={() => setCurrentScreen('soothe-mode')}
+            onSootheModeClick={(riskVariables, riskPercentage) => {
+              setSootheModeData({ riskVariables, riskPercentage });
+              setCurrentScreen('soothe-mode');
+            }}
             lowStimulationMode={lowStimulationMode}
           />
           <BottomNav
@@ -593,7 +596,10 @@ export default function App() {
           <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
-            onSootheModeClick={() => setCurrentScreen('soothe-mode')}
+            onSootheModeClick={(riskVariables, riskPercentage) => {
+              setSootheModeData({ riskVariables, riskPercentage });
+              setCurrentScreen('soothe-mode');
+            }}
             lowStimulationMode={true}
           />
           <BottomNav
@@ -602,9 +608,6 @@ export default function App() {
           />
         </>
       )}
-      
-      {/* Demo Reset Button */}
-      <DemoResetButton />
     </div>
   );
 }

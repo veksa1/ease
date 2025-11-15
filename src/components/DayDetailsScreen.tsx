@@ -15,6 +15,7 @@ import {
 import { MiniLineChart } from './MiniLineChart';
 import { Button } from './ui/button';
 import { PillChip } from './PillChip';
+import { useHourlyRisk } from '../hooks/useDemoData';
 
 interface DayDetailsScreenProps {
   date: Date;
@@ -42,11 +43,22 @@ type Correlation = {
 export function DayDetailsScreen({ date, dayNumber, onBack, onExportPDF }: DayDetailsScreenProps) {
   const [showMethodology, setShowMethodology] = useState(false);
 
-  // Mock data for the 24-hour prediction chart
-  const predictionData = [
-    25, 28, 32, 35, 40, 45, 52, 58, 62, 68, 72, 75, // Morning: gradually increasing
-    78, 76, 74, 70, 65, 58, 52, 48, 42, 38, 32, 28, // Afternoon/Evening: decreasing
-  ];
+  // Fetch real hourly risk data for this date
+  const dateString = date.toISOString().split('T')[0];
+  const { loading: loadingHourlyRisk, hourlyData } = useHourlyRisk(dateString);
+
+  // Convert hourly risk data to chart data (0-100 scale)
+  const predictionData = loadingHourlyRisk
+    ? Array(24).fill(0).map((_, i) => 25 + Math.random() * 50) // Loading placeholder
+    : hourlyData.map(h => h.risk * 100); // Real data from backend
+
+  // Fallback to mock data if no hourly data available
+  const chartData = predictionData.length === 24
+    ? predictionData
+    : [
+        25, 28, 32, 35, 40, 45, 52, 58, 62, 68, 72, 75, // Morning: gradually increasing
+        78, 76, 74, 70, 65, 58, 52, 48, 42, 38, 32, 28, // Afternoon/Evening: decreasing
+      ];
 
   // Mock metric cards data
   const metricCards: MetricCard[] = [
@@ -235,12 +247,18 @@ export function DayDetailsScreen({ date, dayNumber, onBack, onExportPDF }: DayDe
                 <span>0%</span>
               </div>
               <div className="flex-1 overflow-hidden max-w-full" style={{ aspectRatio: '280/120' }}>
-                <MiniLineChart
-                  data={predictionData}
-                  width={280}
-                  height={120}
-                  color="#EF4444"
-                />
+                {loadingHourlyRisk ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-label text-muted-foreground">Loading hourly predictions...</p>
+                  </div>
+                ) : (
+                  <MiniLineChart
+                    data={chartData}
+                    width={280}
+                    height={120}
+                    color="#EF4444"
+                  />
+                )}
               </div>
             </div>
 

@@ -69,6 +69,6 @@ export interface DemoDataset {
 // User timeline (stored in localStorage)
 export interface UserTimelineEntry {
   timestamp: string;
-  type: 'quick_check' | 'migraine_report' | 'note';
+  type: 'quick_check' | 'migraine_report' | 'note' | 'hourly_posterior';
   data: any;
 }

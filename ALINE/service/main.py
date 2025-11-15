@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import torch
 import yaml
 import logging
@@ -63,10 +64,23 @@ app_state = {
 def load_model_and_config():
     """Load model and configuration at startup"""
     try:
+        import os
+        import re
+        
         # Load service config
         config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
         with open(config_path) as f:
-            service_config = yaml.safe_load(f)
+            config_content = f.read()
+            # Expand environment variables in format ${VAR:default}
+            def expand_env_var(match):
+                var_expr = match.group(1)
+                if ':' in var_expr:
+                    var_name, default = var_expr.split(':', 1)
+                    return os.getenv(var_name.strip(), default.strip())
+                else:
+                    return os.getenv(var_expr.strip(), '')
+            config_content = re.sub(r'\$\{([^}]+)\}', expand_env_var, config_content)
+            service_config = yaml.safe_load(config_content)
         
         # Load model config
         model_config_path = Path(__file__).parent.parent / service_config['model']['config_path']
@@ -84,7 +98,15 @@ def load_model_and_config():
         
         # Load model
         checkpoint_path = Path(__file__).parent.parent / service_config['model']['checkpoint_path']
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        if not checkpoint_path.exists():
+            logger.warning(f"Model checkpoint not found at {checkpoint_path}")
+            logger.warning("Service will start but model predictions will be unavailable")
+            app_state['model_loaded'] = False
+            app_state['config'] = service_config
+            return
+        
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         
         model = SimpleALINE(
             in_dim=model_config['in_dim'],
@@ -118,11 +140,33 @@ def load_model_and_config():
         raise
 
 
-# Initialize FastAPI app
+# Lifespan event handler
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    # Startup
+    import os
+    logger.info(f"Starting ALINE service on port {os.getenv('PORT', '8000')}")
+    logger.info(f"Host: {os.getenv('HOST', '0.0.0.0')}")
+    try:
+        load_model_and_config()
+        logger.info("✓ Startup completed successfully")
+    except Exception as e:
+        logger.error(f"✗ Startup failed: {e}", exc_info=True)
+        raise
+    
+    yield
+    
+    # Shutdown (cleanup if needed)
+    logger.info("Shutting down ALINE service")
+
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="ALINE Migraine Prediction API",
     description="API for daily migraine risk prediction with active querying policy",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -133,12 +177,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Load model on startup"""
-    load_model_and_config()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -458,16 +496,21 @@ async def generate_context(request: ContextGenerationRequest):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
     
     # Load config for server settings
     config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
+    # Use PORT env var if available (for Cloud Run compatibility)
+    host = "0.0.0.0"
+    port = int(os.getenv("PORT", config["server"]["port"]))
+    
     uvicorn.run(
-        "main:app",
-        host=config['server']['host'],
-        port=config['server']['port'],
-        reload=config['server']['reload'],
-        workers=config['server']['workers']
+        "service.main:app",   # <-- CORRECT MODULE PATH
+        host=host,
+        port=port,
+        reload=False,
+        workers=1
     )

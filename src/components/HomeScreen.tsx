@@ -21,6 +21,8 @@ import { PillChip } from './PillChip';
 import { ReportMigraineModal } from './ReportMigraineMigral';
 import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
+import { RiskVariable } from '../types';
+import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
 import {
   Carousel,
   CarouselContent,
@@ -45,6 +47,7 @@ interface HomeScreenProps {
   userName: string;
   riskLevel: 'low' | 'moderate' | 'high';
   riskPercentage: number;
+  confidence?: number; // Confidence in the prediction (0-100)
   contextualAction: {
     icon: React.ElementType;
     label: string;
@@ -58,10 +61,11 @@ interface HomeScreenProps {
     upcomingStressor?: string;
   };
   riskContributors?: RiskContributor[];
+  riskVariables?: RiskVariable[];
   whatHelps?: string[];
   onQuickCheckClick?: () => void;
   onInsightsClick?: () => void;
-  onSootheModeClick?: () => void;
+  onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
   showNotification?: 'alert' | 'nudge' | null;
   lowStimulationMode?: boolean;
 }
@@ -70,10 +74,12 @@ export function HomeScreen({
   userName,
   riskLevel,
   riskPercentage,
+  confidence = 85,
   contextualAction,
   streakCount,
   todayData,
   riskContributors = [],
+  riskVariables = [],
   whatHelps = [],
   onQuickCheckClick,
   onInsightsClick,
@@ -83,6 +89,10 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [showDisclaimer, setShowDisclaimer] = React.useState(true);
   const [notificationDismissed, setNotificationDismissed] = React.useState(false);
+  const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
+  const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
+  const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
+  
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -153,11 +163,11 @@ export function HomeScreen({
                 showNotification === 'alert'
                   ? {
                       label: 'Take a 5-min break',
-                      onClick: () => console.log('Taking break'),
+                      onClick: () => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage),
                     }
                   : {
                       label: 'Start break',
-                      onClick: () => console.log('Starting break'),
+                      onClick: () => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage),
                     }
               }
               secondaryAction={
@@ -172,57 +182,75 @@ export function HomeScreen({
             />
           )}
 
+          {/* Follow-up reminder (if due) */}
+          {firstPending && (
+            <div
+              className="border rounded-xl p-4 bg-accent/5 border-accent/20"
+              style={{ borderRadius: '12px' }}
+              role="region"
+              aria-label="SootheMode follow-up"
+            >
+              <p className="text-body mb-3">
+                How did your prevention plan work?
+              </p>
+              <p className="text-label text-muted-foreground mb-4">
+                Triggers: {firstPending.triggerLabels}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="bg-success text-success-foreground hover:bg-success/90"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'prevented')}
+                >
+                  Prevented
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-warning/30 text-warning hover:bg-warning/10"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'reduced')}
+                >
+                  Reduced
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-critical/30 text-critical hover:bg-critical/10"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'no-effect')}
+                >
+                  No effect
+                </Button>
+                <button
+                  className="text-label text-muted-foreground hover:text-foreground px-2"
+                  onClick={() => setDismissedFollowUpIds(prev => new Set(prev).add(firstPending.id))}
+                  aria-label="Dismiss follow-up"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Risk Module - Enhanced Gradient Hero Card */}
           <RiskHeroCard
             percentage={riskPercentage}
             riskLevel={riskLevel}
             confidence={85}
-            riskContributors={riskContributors}
-            riskVariables={[
-              { name: 'HRV', percentage: 12, category: 'biometric', value: '47', unit: 'ms' },
-              { name: 'Resting Heart Rate', percentage: 10, category: 'biometric', value: '72', unit: 'bpm' },
-              { name: 'Sleep Duration', percentage: 15, category: 'biometric', value: '6.5', unit: 'hrs' },
-              { name: 'Body temperature change', percentage: 8, category: 'biometric', value: '+0.4', unit: '°C' },
-              { name: 'Sleep Quality', percentage: 22, category: 'biometric', value: '4.5', unit: '/10' },
-              { name: 'Activity Level', percentage: 7, category: 'biometric', value: '3200', unit: 'steps' },
-              { name: 'Menstrual Phase', percentage: 15, category: 'personal', value: 'Premenstrual', unit: '' },
-              { name: 'Barometric Pressure Change', percentage: 28, category: 'environmental', value: '-6', unit: 'hPa' },
-              { name: 'Base Pressure', percentage: 5, category: 'environmental', value: '1013', unit: 'hPa' },
-              { name: 'Temperature', percentage: 9, category: 'environmental', value: '22', unit: '°C' },
-              { name: 'Weather Changes', percentage: 14, category: 'environmental', value: 'Unstable', unit: '' },
-              { name: 'Humidity', percentage: 11, category: 'environmental', value: '75', unit: '%' },
-              { name: 'Air Quality Index', percentage: 6, category: 'environmental', value: '85', unit: 'AQI' },
-              { name: 'Altitude', percentage: 3, category: 'environmental', value: '850', unit: 'm' },
-              { name: 'Stress Level', percentage: 18, category: 'lifestyle', value: '8.5', unit: '/10' },
-              { name: 'Caffeine Intake change', percentage: 6, category: 'lifestyle', value: '+150', unit: 'mg' },
-              { name: 'Water Intake', percentage: 4, category: 'lifestyle', value: '1.8', unit: 'L' },
-              { name: 'Prodrome Symptoms', percentage: 20, category: 'lifestyle', value: 'Present', unit: '' },
-              { name: 'Screen Time', percentage: 8, category: 'lifestyle', value: '9', unit: 'hrs' },
-              { name: 'Alcohol Intake', percentage: 5, category: 'lifestyle', value: '1', unit: 'drink' },
-              { name: 'Meal Regularity', percentage: 7, category: 'lifestyle', value: 'Irregular', unit: '' },
-              { name: 'Age', percentage: 2, category: 'personal', value: '34', unit: 'years' },
-              { name: 'Body Weight', percentage: 1, category: 'personal', value: '68', unit: 'kg' },
-              { name: 'BMI', percentage: 1, category: 'personal', value: '22.5', unit: '' },
-              { name: 'Migraine History', percentage: 16, category: 'personal', value: '8', unit: 'yrs' },
-            ]}
+            riskVariables={riskVariables}
             whatHelps={whatHelps}
             lowStimulationMode={lowStimulationMode}
           />
 
-          {/* Primary CTA - Quick Check moved to top */}
+          {/* Primary CTA - Take it easy */}
           <Button
-            onClick={onQuickCheckClick}
-            className="w-full h-12 gap-2 relative"
+            onClick={() => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage)}
+            className="w-full h-12 gap-2"
             style={{ borderRadius: '12px' }}
           >
-            <HelpCircle className="w-5 h-5" />
-            Quick check
-            {streakCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-foreground text-label border border-border">
-                <Flame className="w-3 h-3" />
-                {streakCount}
-              </span>
-            )}
+            <span className="truncate">{contextualAction.label}</span>
           </Button>
 
           {/* Secondary Actions */}
@@ -241,14 +269,21 @@ export function HomeScreen({
               }
             />
 
-            {/* Keep up the good habits - moved to secondary */}
+            {/* Quick check */}
             <Button
+              onClick={onQuickCheckClick}
               variant="outline"
-              className="h-12 gap-2"
+              className="h-12 gap-2 relative"
               style={{ borderRadius: '12px' }}
-              onClick={onSootheModeClick}
             >
-              <span className="truncate">{contextualAction.label}</span>
+              <HelpCircle className="w-5 h-5" />
+              Quick check
+              {streakCount > 0 && (
+                <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-foreground text-label border border-border">
+                  <Flame className="w-3 h-3" />
+                  {streakCount}
+                </span>
+              )}
             </Button>
           </div>
 
@@ -353,21 +388,8 @@ export function HomeScreen({
                       icon={Wind}
                       title="Take a breathing break"
                       description="5 minutes of deep breathing can reduce stress and lower migraine risk."
-                      actionLabel="Start now →"
-                      onAction={() => alert('Starting breathing exercise')}
                       iconBgColor="bg-accent/10"
                       iconColor="text-accent"
-                    />
-                  </CarouselItem>
-                  <CarouselItem>
-                    <TipCard
-                      icon={Sun}
-                      title="Try dark mode"
-                      description="Reduce eye strain by switching to dark mode during the day."
-                      actionLabel="Enable →"
-                      onAction={() => alert('Enabling dark mode')}
-                      iconBgColor="bg-primary/10"
-                      iconColor="text-primary"
                     />
                   </CarouselItem>
                   <CarouselItem>
@@ -375,8 +397,6 @@ export function HomeScreen({
                       icon={Droplets}
                       title="Stay hydrated"
                       description="Drink 250ml of water now to prevent dehydration headaches."
-                      actionLabel="Log water →"
-                      onAction={() => alert('Logging water intake')}
                       iconBgColor="bg-success/10"
                       iconColor="text-success"
                     />

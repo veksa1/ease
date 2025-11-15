@@ -38,6 +38,7 @@ export function ReportMigraineModal({
   trigger,
   open,
   onOpenChange,
+  initialDate,
 }: ReportMigraineModalProps) {
   const [isOpen, setIsOpen] = useState(open ?? false);
   const [mode, setMode] = useState<ReportMode>('menu');

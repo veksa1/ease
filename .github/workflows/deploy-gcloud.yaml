@@ -1,0 +1,133 @@
+name: Deploy ALINE Service to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ALINE/service/**'
+      - 'ALINE/models/**'
+      - 'ALINE/configs/**'
+      - 'ALINE/Dockerfile.service'
+      - '.github/workflows/deploy-gcloud.yaml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE_NAME: aline-service
+  REGION: us-central1
+  IMAGE_NAME: gcr.io/${{ secrets.GCP_PROJECT_ID }}/aline-service
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+    
+    - name: Install uv
+      run: pip install uv
+    
+    - name: Install dependencies
+      run: |
+        cd ALINE
+        uv sync
+    
+    - name: Run unit tests
+      run: |
+        cd ALINE
+        uv run python tests/test_aline_forward.py
+        uv run python tests/test_policy.py
+    
+    - name: Test service imports
+      run: |
+        cd ALINE
+        uv run python -c "from service.main import app; print('✓ Service imports successfully')"
+
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: test
+    
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for GCR
+      run: |
+        gcloud auth configure-docker
+
+    - name: Build Docker image
+      run: |
+        cd ALINE
+        docker build -f Dockerfile.service -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:latest .
+
+    - name: Push Docker image to GCR
+      run: |
+        docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        docker push ${{ env.IMAGE_NAME }}:latest
+
+    - name: Clean up Docker to free space
+      run: |
+        docker system prune -af --volumes
+        df -h
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      continue-on-error: true
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+        skip-db-update: false
+        skip-java-db-update: true
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && hashFiles('trivy-results.sarif') != ''
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.SERVICE_NAME }} \
+          --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          --platform managed \
+          --region ${{ env.REGION }} \
+          --allow-unauthenticated \
+          --memory 2Gi \
+          --cpu 2 \
+          --timeout 300 \
+          --max-instances 10 \
+          --min-instances 0 \
+          --set-env-vars "N8N_WEBHOOK_URL=${{ secrets.N8N_WEBHOOK_URL }}" \
+          --port 8080
+
+    - name: Show service URL
+      run: |
+        echo "Service deployed successfully!"
+        gcloud run services describe ${{ env.SERVICE_NAME }} \
+          --platform managed \
+          --region ${{ env.REGION }} \
+          --format 'value(status.url)'
