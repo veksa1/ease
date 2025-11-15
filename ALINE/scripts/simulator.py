@@ -71,17 +71,31 @@ class MigraineSimulator:
         if dist_type == 'normal':
             mu = prior['mu']
             sigma = prior['sigma']
-            return self.rng.normal(mu, sigma)
+            value = self.rng.normal(mu, sigma)
         elif dist_type == 'lognormal':
             mu_ln = prior['mu_ln']
             sigma_ln = prior['sigma_ln']
-            return self.rng.lognormal(mu_ln, sigma_ln)
+            value = self.rng.lognormal(mu_ln, sigma_ln)
         elif dist_type == 'uniform':
             min_val = prior['min']
             max_val = prior['max']
-            return self.rng.uniform(min_val, max_val)
+            value = self.rng.uniform(min_val, max_val)
+        elif dist_type == 'exponential':
+            # Use mu_ln as scale parameter (mean)
+            scale = prior.get('mu_ln', 1.0)
+            value = self.rng.exponential(scale)
+        elif dist_type == 'cyclical':
+            # For cyclical features, they should be computed from timestamps
+            # Return a placeholder that will be overridden
+            value = 0.0
         else:
             raise ValueError(f"Unknown distribution type: {dist_type}")
+        
+        # Clip to valid range if specified
+        if 'min' in prior and 'max' in prior:
+            value = np.clip(value, prior['min'], prior['max'])
+        
+        return value
     
     def _sample_observations(self) -> np.ndarray:
         """Sample all observable features for one time step"""
