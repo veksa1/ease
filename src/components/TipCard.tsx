@@ -5,8 +5,8 @@ interface TipCardProps {
   icon: LucideIcon;
   title: string;
   description: string;
-  actionLabel: string;
-  onAction: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
   iconBgColor?: string;
   iconColor?: string;
 }
@@ -40,12 +40,14 @@ export function TipCard({
       </div>
 
       {/* Action */}
-      <button
-        onClick={onAction}
-        className="text-label text-primary hover:underline"
-      >
-        {actionLabel}
-      </button>
+      {actionLabel && onAction && (
+        <button
+          onClick={onAction}
+          className="text-label text-primary hover:underline"
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }
