@@ -1,0 +1,325 @@
+"""
+FastAPI Service - Ticket 010
+
+REST API service for ALINE migraine prediction model.
+Provides endpoints for:
+- /health - Health check
+- /risk/daily - Daily migraine risk prediction
+- /posterior/hourly - Hourly posterior distributions
+- /policy/topk - Top-k hour recommendations
+
+Author: ALINE Team
+Date: 2025-11-15
+"""
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import torch
+import yaml
+import logging
+from datetime import datetime
+from typing import List
+
+from models.aline import SimpleALINE
+from models.policy_utils import compute_priority_scores, select_topk_hours
+from service.schemas import (
+    HealthResponse,
+    DailyRiskRequest,
+    DailyRiskResponse,
+    PosteriorRequest,
+    PosteriorResponse,
+    HourlyPosterior,
+    PolicyRequest,
+    PolicyResponse,
+    SelectedHour
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global state
+app_state = {
+    'model': None,
+    'device': None,
+    'config': None,
+    'migraine_weights': None,
+    'migraine_bias': None,
+    'model_loaded': False
+}
+
+
+def load_model_and_config():
+    """Load model and configuration at startup"""
+    try:
+        # Load service config
+        config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
+        with open(config_path) as f:
+            service_config = yaml.safe_load(f)
+        
+        # Load model config
+        model_config_path = Path(__file__).parent.parent / service_config['model']['config_path']
+        with open(model_config_path) as f:
+            model_config = yaml.safe_load(f)
+        
+        # Determine device
+        device_setting = service_config['model']['device']
+        if device_setting == 'auto':
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            device = torch.device(device_setting)
+        
+        logger.info(f"Using device: {device}")
+        
+        # Load model
+        checkpoint_path = Path(__file__).parent.parent / service_config['model']['checkpoint_path']
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        model = SimpleALINE(
+            in_dim=model_config['in_dim'],
+            z_dim=model_config['z_dim'],
+            d_model=model_config['d_model'],
+            nhead=model_config['nhead'],
+            nlayers=model_config['nlayers']
+        )
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+        
+        logger.info(f"Model loaded successfully from {checkpoint_path}")
+        logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+        
+        # Store in global state
+        app_state['model'] = model
+        app_state['device'] = device
+        app_state['config'] = service_config
+        app_state['migraine_weights'] = torch.tensor(
+            service_config['migraine_model']['weights'],
+            device=device
+        )
+        app_state['migraine_bias'] = service_config['migraine_model']['bias']
+        app_state['model_loaded'] = True
+        
+        logger.info("✓ Service initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to load model: {e}")
+        raise
+
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="ALINE Migraine Prediction API",
+    description="API for daily migraine risk prediction with active querying policy",
+    version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Load model on startup"""
+    load_model_and_config()
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    """Health check endpoint"""
+    return HealthResponse(
+        status="ok",
+        timestamp=datetime.now().isoformat(),
+        model_loaded=app_state['model_loaded']
+    )
+
+
+@app.post("/risk/daily", response_model=DailyRiskResponse)
+async def risk_daily(request: DailyRiskRequest):
+    """
+    Predict daily migraine risk from 24 hours of data.
+    
+    Returns mean probability and 90% confidence interval.
+    """
+    if not app_state['model_loaded']:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        # Validate input
+        if len(request.features) != 24:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 24 hours of features, got {len(request.features)}"
+            )
+        
+        # Convert to tensor
+        features = torch.FloatTensor(request.features).unsqueeze(0)  # [1, 24, n_features]
+        features = features.to(app_state['device'])
+        
+        # Model inference
+        model = app_state['model']
+        with torch.no_grad():
+            posterior, _ = model(features)
+            
+            # Sample from posterior to get uncertainty
+            n_samples = 1000
+            mu = posterior.mean[0, -1, :]  # Last time step
+            sigma = posterior.stddev[0, -1, :]
+            
+            samples = torch.randn(n_samples, len(mu), device=app_state['device']) * sigma + mu
+            probs = torch.sigmoid((samples @ app_state['migraine_weights']) + app_state['migraine_bias'])
+            
+            mean_prob = probs.mean().item()
+            lower_bound = torch.quantile(probs, 0.05).item()
+            upper_bound = torch.quantile(probs, 0.95).item()
+        
+        return DailyRiskResponse(
+            user_id=request.user_id,
+            mean_probability=mean_prob,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            timestamp=datetime.now().isoformat()
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in risk_daily: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/posterior/hourly", response_model=PosteriorResponse)
+async def posterior_hourly(request: PosteriorRequest):
+    """
+    Get hourly posterior distributions over latent states.
+    
+    Returns mean and std for each hour.
+    """
+    if not app_state['model_loaded']:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        # Validate input
+        if len(request.features) != 24:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 24 hours of features, got {len(request.features)}"
+            )
+        
+        # Convert to tensor
+        features = torch.FloatTensor(request.features).unsqueeze(0)
+        features = features.to(app_state['device'])
+        
+        # Model inference
+        model = app_state['model']
+        with torch.no_grad():
+            posterior, _ = model(features)
+            means = posterior.mean[0].cpu().numpy()  # [24, z_dim]
+            stds = posterior.stddev[0].cpu().numpy()  # [24, z_dim]
+        
+        # Build response
+        hourly_posteriors = [
+            HourlyPosterior(
+                hour=i,
+                mean=means[i].tolist(),
+                std=stds[i].tolist()
+            )
+            for i in range(24)
+        ]
+        
+        return PosteriorResponse(
+            user_id=request.user_id,
+            hourly_posteriors=hourly_posteriors,
+            timestamp=datetime.now().isoformat()
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in posterior_hourly: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/policy/topk", response_model=PolicyResponse)
+async def policy_topk(request: PolicyRequest):
+    """
+    Recommend top-k hours to sample/query based on priority scores.
+    
+    Uses uncertainty and impact to select most informative hours.
+    """
+    if not app_state['model_loaded']:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        # Validate input
+        if len(request.features) != 24:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected 24 hours of features, got {len(request.features)}"
+            )
+        
+        # Convert to tensor
+        features = torch.FloatTensor(request.features).unsqueeze(0)
+        features = features.to(app_state['device'])
+        
+        # Model inference
+        model = app_state['model']
+        with torch.no_grad():
+            posterior, _ = model(features)
+            
+            # Compute priority scores
+            priority_scores = compute_priority_scores(
+                posterior.mean[0],
+                posterior.stddev[0],
+                app_state['migraine_weights'],
+                app_state['migraine_bias'],
+                lambda1=app_state['config']['policy']['lambda1'],
+                lambda2=app_state['config']['policy']['lambda2'],
+                lambda3=app_state['config']['policy']['lambda3']
+            )
+            
+            # Select top-k
+            indices, scores = select_topk_hours(priority_scores, request.k, return_scores=True)
+        
+        # Build response
+        selected_hours = [
+            SelectedHour(
+                hour=int(indices[i].item()),
+                priority_score=float(scores[i].item())
+            )
+            for i in range(len(indices))
+        ]
+        
+        return PolicyResponse(
+            user_id=request.user_id,
+            selected_hours=selected_hours,
+            k=request.k,
+            timestamp=datetime.now().isoformat()
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in policy_topk: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Load config for server settings
+    config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    
+    uvicorn.run(
+        "main:app",
+        host=config['server']['host'],
+        port=config['server']['port'],
+        reload=config['server']['reload'],
+        workers=config['server']['workers']
+    )

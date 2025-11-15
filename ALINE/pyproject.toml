@@ -1,0 +1,24 @@
+[project]
+name = "aline"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.2.1",
+    "pandas>=2.2.3",
+    "scipy>=1.15.0",
+    "openpyxl>=3.1.5",
+    "matplotlib>=3.9.0",
+    "seaborn>=0.13.2",
+    "torch>=2.5.0",
+    "pyyaml>=6.0.0",
+    "pytest>=9.0.1",
+    "scikit-learn>=1.7.2",
+    "jupyter>=1.1.1",
+    "notebook>=7.4.7",
+    "ipykernel>=7.1.0",
+    "fastapi>=0.121.2",
+    "uvicorn>=0.38.0",
+    "pydantic>=2.12.4",
+]
