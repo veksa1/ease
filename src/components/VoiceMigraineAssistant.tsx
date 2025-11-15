@@ -11,9 +11,7 @@ import {
   Loader2,
   Volume2,
   AlertTriangle,
-  CheckCircle2,
   ArrowLeft,
-  Save,
   RefreshCcw,
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -24,10 +22,7 @@ import {
   applyVoiceFieldUpdate,
   extractVoiceAssistantMetadata,
   finalizeFormDataFromPartial,
-  getMissingFields,
   mapVoicePayloadToFormData,
-  VOICE_FIELD_CONFIG,
-  VoiceFieldConfig,
   VoiceIntakePayload,
 } from '../utils/voiceReportMapper';
 import { getRealtimeSessionEndpoint } from '../utils/env';
@@ -97,6 +92,9 @@ const MIGRAINE_TOOL_SCHEMA = {
     required: ['onsetDate', 'severity', 'symptoms', 'triggers'],
   },
 } as const;
+
+const AUDIO_POST_BUFFER_GRACE_MS = 600;
+const AUDIO_FALLBACK_TIMEOUT_MS = 3000;
 
 type AssistantStatus =
   | 'idle'
@@ -174,7 +172,6 @@ export function VoiceMigraineAssistant({
   });
   const [structuredReport, setStructuredReport] = useState<MigraineReportFormData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [autoSummaryQueued, setAutoSummaryQueued] = useState(false);
   const [lastUserSpeechAt, setLastUserSpeechAt] = useState<number | null>(null);
   const [lastSavedReport, setLastSavedReport] = useState<MigraineReportFormData | null>(null);
 
@@ -184,9 +181,25 @@ export function VoiceMigraineAssistant({
   const localStreamRef = useRef<MediaStream | null>(null);
   const assistantBuffers = useRef<Record<string, string>>({});
   const metadataBuffer = useRef('');
+  const pendingTeardownAfterAudio = useRef(false);
+  const audioGraceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processedFunctionCallIds = useRef<Set<string>>(new Set());
 
+  const clearAudioCompletionTimers = useCallback(() => {
+    if (audioGraceTimeoutRef.current) {
+      clearTimeout(audioGraceTimeoutRef.current);
+      audioGraceTimeoutRef.current = null;
+    }
+    if (audioFallbackTimeoutRef.current) {
+      clearTimeout(audioFallbackTimeoutRef.current);
+      audioFallbackTimeoutRef.current = null;
+    }
+  }, []);
+
   const teardownSession = useCallback(() => {
+    clearAudioCompletionTimers();
+    pendingTeardownAfterAudio.current = false;
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
 
@@ -197,36 +210,40 @@ export function VoiceMigraineAssistant({
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
     }
-  }, []);
+  }, [clearAudioCompletionTimers]);
 
   const stopListening = useCallback(() => {
     teardownSession();
     setStatus('idle');
   }, [teardownSession]);
 
-  const missingFields = useMemo(
-    () => (structuredReport ? [] : getMissingFields(collectedData)),
-    [structuredReport, collectedData]
-  );
-
-  const readyForSummary = missingFields.length === 0;
   const hasUserInput = transcript.some(message => message.role === 'user');
 
   const appendTranscript = useCallback((message: TranscriptMessage) => {
     setTranscript(prev => [...prev, message]);
   }, []);
 
-  const finalizeFromCollected = useCallback((): MigraineReportFormData => {
-    const normalized = finalizeFormDataFromPartial(collectedData);
-    setCollectedData(normalized);
-    setStructuredReport(normalized);
-    setStatus('summary');
-    setLastUserSpeechAt(null);
-    return normalized;
-  }, [collectedData]);
+  const scheduleTeardownAfterAudio = useCallback(
+    (delayMs: number) => {
+      if (audioGraceTimeoutRef.current) {
+        clearTimeout(audioGraceTimeoutRef.current);
+      }
+      audioGraceTimeoutRef.current = setTimeout(() => {
+        audioGraceTimeoutRef.current = null;
+        teardownSession();
+      }, delayMs);
+    },
+    [teardownSession]
+  );
 
   const saveReport = useCallback(
-    async (override?: MigraineReportFormData) => {
+    async (
+      override?: MigraineReportFormData,
+      options?: {
+        delayTeardown?: boolean;
+      }
+    ) => {
+      const delayTeardown = options?.delayTeardown ?? false;
       setIsSaving(true);
       setError(null);
       setStatus('saving');
@@ -239,7 +256,12 @@ export function VoiceMigraineAssistant({
         await service.createReport(payload);
         setStatus('saved');
         setLastSavedReport(payload);
-        teardownSession();
+        if (delayTeardown) {
+          clearAudioCompletionTimers();
+          pendingTeardownAfterAudio.current = true;
+        } else {
+          teardownSession();
+        }
         onSaved?.();
       } catch (err) {
         console.error('[VoiceAssistant] Failed to save report', err);
@@ -249,7 +271,7 @@ export function VoiceMigraineAssistant({
         setIsSaving(false);
       }
     },
-    [structuredReport, collectedData, onSaved, stopListening, onClose]
+    [structuredReport, collectedData, onSaved, teardownSession, clearAudioCompletionTimers]
   );
 
   const handleFunctionCall = useCallback(
@@ -285,7 +307,7 @@ export function VoiceMigraineAssistant({
         setStructuredReport(normalized);
         setStatus('summary');
 
-        await saveReport(normalized);
+        await saveReport(normalized, { delayTeardown: true });
 
         if (callId) {
           dataChannelRef.current?.send(
@@ -312,34 +334,6 @@ export function VoiceMigraineAssistant({
     },
     [collectedData, saveReport]
   );
-
-  useEffect(() => {
-    if (
-      !readyForSummary ||
-      autoSummaryQueued ||
-      status === 'saving' ||
-      status === 'saved' ||
-      !hasUserInput
-    ) {
-      return;
-    }
-
-    setAutoSummaryQueued(true);
-    if (structuredReport) {
-      saveReport(structuredReport);
-    } else {
-      const normalized = finalizeFromCollected();
-      saveReport(normalized);
-    }
-  }, [
-    readyForSummary,
-    structuredReport,
-    autoSummaryQueued,
-    hasUserInput,
-    status,
-    saveReport,
-    finalizeFromCollected,
-  ]);
 
   useEffect(() => {
     if (
@@ -400,7 +394,7 @@ export function VoiceMigraineAssistant({
         setCollectedData(normalized);
         setStructuredReport(normalized);
         setStatus('summary');
-        saveReport(normalized);
+        saveReport(normalized, { delayTeardown: true });
       }
     },
     [appendTranscript, collectedData, saveReport]
@@ -452,6 +446,28 @@ export function VoiceMigraineAssistant({
           const part = payload.part;
           if (part?.type === 'function_call') {
             handleFunctionCall(part);
+          }
+          break;
+        }
+        case 'response.audio.done': {
+          if (pendingTeardownAfterAudio.current && !audioFallbackTimeoutRef.current) {
+            audioFallbackTimeoutRef.current = setTimeout(() => {
+              audioFallbackTimeoutRef.current = null;
+              if (!pendingTeardownAfterAudio.current) return;
+              pendingTeardownAfterAudio.current = false;
+              scheduleTeardownAfterAudio(AUDIO_POST_BUFFER_GRACE_MS);
+            }, AUDIO_FALLBACK_TIMEOUT_MS);
+          }
+          break;
+        }
+        case 'output_audio_buffer.stopped': {
+          if (pendingTeardownAfterAudio.current) {
+            pendingTeardownAfterAudio.current = false;
+            if (audioFallbackTimeoutRef.current) {
+              clearTimeout(audioFallbackTimeoutRef.current);
+              audioFallbackTimeoutRef.current = null;
+            }
+            scheduleTeardownAfterAudio(AUDIO_POST_BUFFER_GRACE_MS);
           }
           break;
         }
@@ -538,9 +554,9 @@ export function VoiceMigraineAssistant({
       symptoms: [],
       triggers: [],
     });
-    setAutoSummaryQueued(false);
-    setLastSavedReport(null);
     setLastUserSpeechAt(null);
+    setLastSavedReport(null);
+    pendingTeardownAfterAudio.current = false;
     processedFunctionCallIds.current.clear();
     assistantBuffers.current = {};
     metadataBuffer.current = '';
@@ -631,30 +647,6 @@ export function VoiceMigraineAssistant({
     }
   };
 
-  const formatFieldValue = useCallback(
-    (field: VoiceFieldConfig, data: Partial<MigraineReportFormData>) => {
-      const finalized = Boolean(structuredReport);
-      const value = data[field.id];
-      if (field.id === 'onsetDate' && value instanceof Date) {
-        return value.toLocaleString();
-      }
-      if (Array.isArray(value)) {
-        if (value.length === 0) {
-          return finalized ? 'Not specified' : 'Pending';
-        }
-        return value.join(', ');
-      }
-      if (typeof value === 'boolean') {
-        return value ? 'Yes' : 'No';
-      }
-      if (value === undefined || value === '') {
-        return finalized ? 'Unknown' : 'Pending';
-      }
-      return `${value}`;
-    },
-    [structuredReport]
-  );
-
   const statusLabel = (() => {
     switch (status) {
       case 'idle':
@@ -711,7 +703,7 @@ export function VoiceMigraineAssistant({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="grid w-full gap-6 p-6 lg:grid-cols-[2fr,1fr]">
+        <div className="mx-auto w-full max-w-3xl p-6">
           <section className="flex flex-col rounded-3xl border border-border bg-card/60 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -798,98 +790,6 @@ export function VoiceMigraineAssistant({
               </div>
             )}
           </section>
-
-          <aside className="flex flex-col gap-6 rounded-3xl border border-border bg-card/60 p-6">
-            <div>
-              <h3 className="text-h3">Clinical checklist</h3>
-              <p className="text-sm text-muted-foreground">
-                Each item must be confirmed before we can save your report.
-              </p>
-            </div>
-            <div className="space-y-3">
-              {VOICE_FIELD_CONFIG.map(field => {
-                const missing = missingFields.some(item => item.id === field.id);
-                const value = formatFieldValue(field, collectedData);
-                return (
-                  <div
-                    key={field.id}
-                    className="flex items-start justify-between rounded-2xl border border-border/60 px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">{field.label}</p>
-                      <p className="text-xs text-muted-foreground">{value}</p>
-                    </div>
-                    {missing ? (
-                      <Badge variant="secondary">Pending</Badge>
-                    ) : (
-                      <Badge className="bg-success/10 text-success">Captured</Badge>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-border/60 p-4">
-              <h4 className="text-h4">Status</h4>
-              {structuredReport ? (
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2 text-success">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <p className="text-sm font-semibold">Ready to save</p>
-                  </div>
-                  <Button
-                    size="lg"
-                    onClick={saveReport}
-                    disabled={isSaving}
-                    className="gap-2"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Save migraine report
-                      </>
-                    )}
-                  </Button>
-                  {status === 'saved' && (
-                    <p className="text-sm text-muted-foreground">
-                      Report saved. Closing the assistant…
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {readyForSummary
-                      ? 'All required information is captured. Dr. Ease will thank you and save automatically.'
-                      : 'The assistant will keep asking brief questions until every item is captured.'}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      if (!hasUserInput) return;
-                      const normalized = finalizeFromCollected();
-                      saveReport(normalized);
-                    }}
-                    disabled={!hasUserInput}
-                    className="gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    Finish & save now
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {hasUserInput
-                      ? 'This saves whatever information has been captured so far, even if some items are still pending.'
-                      : 'Start speaking first so we can capture at least a few details before saving.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </aside>
         </div>
       </div>
 
