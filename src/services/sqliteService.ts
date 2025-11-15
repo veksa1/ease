@@ -6,10 +6,10 @@
  */
 
 import initSqlJs, { Database } from 'sql.js';
-import { TriggerCombination, InterventionInstruction, InterventionEffectiveness } from '../types';
+import { TriggerCombination, InterventionInstruction, InterventionEffectiveness, PersonalMigraineProfile } from '../types';
 
 const DB_NAME = 'ease_app_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'sqlitedb';
 
 class SQLiteService {
@@ -36,6 +36,19 @@ class SQLiteService {
         
         if (savedDb) {
           this.db = new SQL.Database(savedDb);
+          // Ensure new tables exist even on older DBs (migration)
+          this.db.run(`
+            CREATE TABLE IF NOT EXISTS personal_migraine_profile (
+              id INTEGER PRIMARY KEY CHECK (id = 1),
+              migraine_history_years REAL NOT NULL,
+              menstrual_phase TEXT NOT NULL,
+              age REAL NOT NULL,
+              weight_kg REAL,
+              bmi REAL,
+              updated_at TEXT NOT NULL
+            )
+          `);
+          await this.saveToIndexedDB();
         } else {
           // Create new database
           this.db = new SQL.Database();
@@ -136,6 +149,19 @@ class SQLiteService {
         failure_count INTEGER DEFAULT 0,
         last_used TEXT NOT NULL,
         PRIMARY KEY (instruction_id, trigger_combination_id)
+      )
+    `);
+
+    // Personal migraine profile (single row)
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS personal_migraine_profile (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        migraine_history_years REAL NOT NULL,
+        menstrual_phase TEXT NOT NULL,
+        age REAL NOT NULL,
+        weight_kg REAL,
+        bmi REAL,
+        updated_at TEXT NOT NULL
       )
     `);
 
@@ -517,6 +543,58 @@ class SQLiteService {
       triggerLabels: row[1] as string,
       followUpAt: row[2] as string,
     }));
+  }
+
+  // ==================== Personal Migraine Profile ====================
+
+  async savePersonalMigraineProfile(profile: PersonalMigraineProfile): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db.run(
+      `INSERT INTO personal_migraine_profile 
+       (id, migraine_history_years, menstrual_phase, age, weight_kg, bmi, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         migraine_history_years = excluded.migraine_history_years,
+         menstrual_phase = excluded.menstrual_phase,
+         age = excluded.age,
+         weight_kg = excluded.weight_kg,
+         bmi = excluded.bmi,
+         updated_at = excluded.updated_at`,
+      [
+        profile.migraineHistoryYears,
+        profile.menstrualPhase,
+        profile.age,
+        profile.weightKg ?? null,
+        profile.bmi ?? null,
+        new Date().toISOString(),
+      ]
+    );
+
+    await this.saveToIndexedDB();
+  }
+
+  async getPersonalMigraineProfile(): Promise<PersonalMigraineProfile | null> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const results = this.db.exec(
+      `SELECT migraine_history_years, menstrual_phase, age, weight_kg, bmi
+       FROM personal_migraine_profile WHERE id = 1`
+    );
+
+    if (!results.length || !results[0].values.length) return null;
+
+    const row = results[0].values[0];
+
+    return {
+      migraineHistoryYears: row[0] as number,
+      menstrualPhase: row[1] as PersonalMigraineProfile['menstrualPhase'],
+      age: row[2] as number,
+      weightKg: row[3] as number | null ?? undefined,
+      bmi: row[4] as number | null ?? undefined,
+    };
   }
 
   // ==================== Utility Operations ====================

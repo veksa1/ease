@@ -44,3 +44,11 @@ export interface InterventionEffectiveness {
   lastUsed: string;
   averageEffectiveness: number; // 0-1 score
 }
+
+export interface PersonalMigraineProfile {
+  migraineHistoryYears: number;
+  menstrualPhase: 'none' | 'premenstrual' | 'menstrual' | 'postmenstrual' | 'perimenopause' | 'other';
+  age: number;
+  weightKg?: number;
+  bmi?: number;
+}

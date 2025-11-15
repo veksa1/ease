@@ -19,6 +19,8 @@ import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
 import { RiskVariable } from './types';
+import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDetailsStep';
+import type { PersonalMigraineProfile } from './types';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
@@ -73,6 +75,8 @@ export default function App() {
     whoop: { connected: false, lastSync: undefined },
   });
 
+  const [personalProfile, setPersonalProfile] = useState<PersonalMigraineProfile | null>(null);
+
   const handleConsentChange = (key: keyof typeof consents) => (checked: boolean) => {
     setConsents(prev => ({ ...prev, [key]: checked }));
   };
@@ -89,14 +93,14 @@ export default function App() {
 
   // Onboarding navigation
   const handleOnboardingNext = () => {
-    if (onboardingStep === 1) {
-      setOnboardingStep(2);
+    if (currentScreen === 'onboarding-1') {
       setCurrentScreen('onboarding-2');
-    } else if (onboardingStep === 2) {
-      setOnboardingStep(3);
+    } else if (currentScreen === 'onboarding-2') {
       setCurrentScreen('onboarding-3');
-    } else if (onboardingStep === 3) {
-      setCurrentScreen('connect-devices');
+    } else if (currentScreen === 'onboarding-3') {
+      setCurrentScreen('onboarding-4');
+    } else if (currentScreen === 'onboarding-4') {
+      // no-op: final step handled inside OnboardingPersonalDetailsStep
     }
   };
 
@@ -121,7 +125,7 @@ export default function App() {
         <>
           <header className="px-6 pt-6 pb-4">
             <div className="max-w-md mx-auto">
-              <OnboardingProgress currentStep={1} totalSteps={3} />
+              <OnboardingProgress currentStep={1} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6">
@@ -204,7 +208,7 @@ export default function App() {
         <>
           <header className="px-6 pt-6 pb-4">
             <div className="max-w-md mx-auto">
-              <OnboardingProgress currentStep={2} totalSteps={3} />
+              <OnboardingProgress currentStep={2} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
@@ -296,7 +300,7 @@ export default function App() {
         <>
           <header className="px-6 pt-6 pb-4">
             <div className="max-w-md mx-auto">
-              <OnboardingProgress currentStep={3} totalSteps={3} />
+              <OnboardingProgress currentStep={3} totalSteps={4} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
@@ -365,10 +369,31 @@ export default function App() {
                   className="w-full h-12"
                   style={{ borderRadius: '12px' }}
                 >
-                  Agree and continue
+                  Continue
                 </Button>
               </div>
             </div>
+          </main>
+        </>
+      )}
+
+      {currentScreen === 'onboarding-4' && (
+        <>
+          <header className="px-6 pt-6 pb-4">
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={4} totalSteps={4} />
+            </div>
+          </header>
+          <main className="flex-1 px-6 pb-6 overflow-y-auto">
+            <OnboardingPersonalDetailsStep
+              initialValue={personalProfile || undefined}
+              onBack={() => setCurrentScreen('onboarding-3')}
+              onSubmit={async (profile) => {
+                await sqliteService.savePersonalMigraineProfile(profile);
+                setPersonalProfile(profile);
+                setCurrentScreen('home');
+              }}
+            />
           </main>
         </>
       )}

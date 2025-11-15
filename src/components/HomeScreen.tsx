@@ -60,6 +60,7 @@ interface HomeScreenProps {
     upcomingStressor?: string;
   };
   riskContributors?: RiskContributor[];
+  riskVariables?: RiskVariable[];
   whatHelps?: string[];
   onQuickCheckClick?: () => void;
   onInsightsClick?: () => void;
@@ -76,6 +77,7 @@ export function HomeScreen({
   streakCount,
   todayData,
   riskContributors = [],
+  riskVariables = [],
   whatHelps = [],
   onQuickCheckClick,
   onInsightsClick,
@@ -88,35 +90,6 @@ export function HomeScreen({
   const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
   const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
   const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
-  
-  // Risk variables data for SootheMode
-  const riskVariables: RiskVariable[] = [
-    { name: 'HRV', percentage: 12, category: 'biometric', value: '47', unit: 'ms' },
-    { name: 'Resting Heart Rate', percentage: 10, category: 'biometric', value: '72', unit: 'bpm' },
-    { name: 'Sleep Duration', percentage: 15, category: 'biometric', value: '6.5', unit: 'hrs' },
-    { name: 'Body temperature change', percentage: 8, category: 'biometric', value: '+0.4', unit: '°C' },
-    { name: 'Sleep Quality', percentage: 22, category: 'biometric', value: '4.5', unit: '/10' },
-    { name: 'Activity Level', percentage: 7, category: 'biometric', value: '3200', unit: 'steps' },
-    { name: 'Menstrual Phase', percentage: 15, category: 'personal', value: 'Premenstrual', unit: '' },
-    { name: 'Barometric Pressure Change', percentage: 28, category: 'environmental', value: '-6', unit: 'hPa' },
-    { name: 'Base Pressure', percentage: 5, category: 'environmental', value: '1013', unit: 'hPa' },
-    { name: 'Temperature', percentage: 9, category: 'environmental', value: '22', unit: '°C' },
-    { name: 'Weather Changes', percentage: 14, category: 'environmental', value: 'Unstable', unit: '' },
-    { name: 'Humidity', percentage: 11, category: 'environmental', value: '75', unit: '%' },
-    { name: 'Air Quality Index', percentage: 6, category: 'environmental', value: '85', unit: 'AQI' },
-    { name: 'Altitude', percentage: 3, category: 'environmental', value: '850', unit: 'm' },
-    { name: 'Stress Level', percentage: 18, category: 'lifestyle', value: '8.5', unit: '/10' },
-    { name: 'Caffeine Intake change', percentage: 6, category: 'lifestyle', value: '+150', unit: 'mg' },
-    { name: 'Water Intake', percentage: 4, category: 'lifestyle', value: '1.8', unit: 'L' },
-    { name: 'Prodrome Symptoms', percentage: 20, category: 'lifestyle', value: 'Present', unit: '' },
-    { name: 'Screen Time', percentage: 8, category: 'lifestyle', value: '9', unit: 'hrs' },
-    { name: 'Alcohol Intake', percentage: 5, category: 'lifestyle', value: '1', unit: 'drink' },
-    { name: 'Meal Regularity', percentage: 7, category: 'lifestyle', value: 'Irregular', unit: '' },
-    { name: 'Age', percentage: 2, category: 'personal', value: '34', unit: 'years' },
-    { name: 'Body Weight', percentage: 1, category: 'personal', value: '68', unit: 'kg' },
-    { name: 'BMI', percentage: 1, category: 'personal', value: '22.5', unit: '' },
-    { name: 'Migraine History', percentage: 16, category: 'personal', value: '8', unit: 'yrs' },
-  ];
   
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -264,7 +237,6 @@ export function HomeScreen({
             percentage={riskPercentage}
             riskLevel={riskLevel}
             confidence={85}
-            riskContributors={riskContributors}
             riskVariables={riskVariables}
             whatHelps={whatHelps}
             lowStimulationMode={lowStimulationMode}
