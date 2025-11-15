@@ -37,7 +37,38 @@ Enable users to confirm/correct migraine predictions, feeding back into personal
 
 ## 🧩 Tasks
 
-### 1. Create Database Schema for Feedback
+### 1. Storage Strategy - SQLite ✅
+
+**DECISION:** Use SQLite for feedback storage (matches existing architecture)
+
+**Database Schema:**
+
+```sql
+CREATE TABLE user_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    feedback_date TEXT NOT NULL,  -- ISO 8601 date
+    predicted_risk REAL NOT NULL,  -- What we predicted (0-1)
+    actual_outcome TEXT NOT NULL,  -- 'migraine' or 'no_migraine'
+    severity INTEGER,  -- 1-10 if migraine, NULL otherwise
+    timestamp INTEGER NOT NULL,  -- Unix timestamp
+    notes TEXT,
+    UNIQUE(user_id, feedback_date)
+);
+
+CREATE INDEX idx_user_feedback ON user_feedback(user_id, feedback_date);
+CREATE INDEX idx_timestamp ON user_feedback(timestamp);
+```
+
+**Benefits:**
+- Same database as calendar connections
+- Simple JSON export for ML retraining
+- Can join with predictions for accuracy metrics
+- No additional infrastructure
+
+---
+
+### 2. Design Feedback Data Schema
 
 **File:** `service/database.py`
 

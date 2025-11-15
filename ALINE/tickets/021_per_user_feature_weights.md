@@ -2,13 +2,33 @@
 
 **Date:** 2025-11-16  
 **Owner:** ML Engineering  
-**Status:** 🔧 To Do  
+**Status:** ⏸️ HOLD - Blocked by Real Data Validation
+**Decision:** SKIP for MVP based on personalization study results  
 **Priority:** High  
 **Effort:** Large (2-3 days)
 
 ---
 
-## 🎯 Objective
+## ⚠️ BLOCKING ISSUE - DO NOT IMPLEMENT
+
+**Personalization study (notebooks/personalization_study.ipynb) showed:**
+- Baseline model: AUC 0.73 ✅
+- User embeddings: AUC 0.61 ❌ (overfitting)
+- Hierarchical Bayesian: AUC 0.50 ❌ (failed)
+
+**Root cause:** Insufficient data per user (2,400 samples vs. 10,000+ needed)
+
+**Decision:** Wait for real production data showing user heterogeneity before implementing.
+
+**Criteria to unblock:**
+1. Collect 50+ users with 1000+ days each
+2. Demonstrate significant inter-user weight variance (σ > 0.3)
+3. Re-run study on real data
+4. Only proceed if personalized > baseline
+
+---
+
+## 🎯 Original Objective (For Reference)
 
 Replace fixed migraine prediction weights with user-specific learned embeddings to capture individual trigger profiles. Different users have different migraine triggers—this ticket enables the model to learn personalized risk patterns.
 

@@ -10,7 +10,9 @@
 
 ## 🎯 Objective
 
-Add missing biometric, demographic, and medical features from `data/migraine_features.json` to complete the feature set. Expand from current 20 features to full 25+ variable schema.
+Add missing biometric, demographic, and medical features **EXACTLY as defined in `data/migraine_features.json`** to complete the feature set. Expand from current 20 features to 35 total (20 base + 4 temporal + 11 new).
+
+**CRITICAL:** Use ONLY the variables from `migraine_features.json` - no additions or substitutions.
 
 ---
 
