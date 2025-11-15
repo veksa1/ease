@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - REACT_APP_ENVIRONMENT=production
+      - BACKEND_URL=${BACKEND_URL}
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Reverse proxy with SSL (using Traefik)
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    restart: unless-stopped
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.middlewares=redirect-to-https"
+      - "traefik.http.routers.frontend-secure.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend-secure.entrypoints=websecure"
+      - "traefik.http.routers.frontend-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-secure.service=frontend"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  letsencrypt:
