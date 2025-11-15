@@ -47,7 +47,6 @@ export interface InterventionEffectiveness {
 
 export interface PersonalMigraineProfile {
   migraineHistoryYears: number;
-  menstrualPhase: 'none' | 'premenstrual' | 'menstrual' | 'postmenstrual' | 'perimenopause' | 'other';
   age: number;
   weightKg?: number;
   bmi?: number;

@@ -36,6 +36,8 @@ class SQLiteService {
         
         if (savedDb) {
           this.db = new SQL.Database(savedDb);
+          // Check if migration is needed for personal_migraine_profile table
+          await this.migratePersonalProfileTable();
           // Ensure schema exists (for migrations/updates)
           await this.createSchema();
         } else {
@@ -50,6 +52,79 @@ class SQLiteService {
     })();
 
     return this.initPromise;
+  }
+
+  /**
+   * Migrate personal_migraine_profile table to remove menstrual_phase column
+   */
+  private async migratePersonalProfileTable(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // Check if table exists and has menstrual_phase column
+      const tableInfo = this.db.exec(`PRAGMA table_info(personal_migraine_profile)`);
+      
+      if (tableInfo.length === 0) {
+        // Table doesn't exist yet, no migration needed
+        return;
+      }
+
+      // Check if menstrual_phase column exists
+      const columns = tableInfo[0].values;
+      const hasMenstrualPhase = columns.some(col => col[1] === 'menstrual_phase');
+
+      if (hasMenstrualPhase) {
+        // Backup existing data
+        const existingData = this.db.exec(`SELECT * FROM personal_migraine_profile WHERE id = 1`);
+        
+        // Drop the old table
+        this.db.run(`DROP TABLE IF EXISTS personal_migraine_profile`);
+        
+        // Create new table without menstrual_phase (will be created in createSchema)
+        // But we need to do it now to restore data
+        this.db.run(`
+          CREATE TABLE personal_migraine_profile (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            migraine_history_years REAL NOT NULL,
+            age REAL NOT NULL,
+            weight_kg REAL,
+            bmi REAL,
+            updated_at TEXT NOT NULL
+          )
+        `);
+        
+        // Restore data if it existed (without menstrual_phase)
+        if (existingData.length > 0 && existingData[0].values.length > 0) {
+          const row = existingData[0].values[0];
+          const columns = existingData[0].columns;
+          
+          // Find column indices
+          const migraineYearsIdx = columns.indexOf('migraine_history_years');
+          const ageIdx = columns.indexOf('age');
+          const weightIdx = columns.indexOf('weight_kg');
+          const bmiIdx = columns.indexOf('bmi');
+          const updatedAtIdx = columns.indexOf('updated_at');
+          
+          this.db.run(
+            `INSERT INTO personal_migraine_profile 
+             (id, migraine_history_years, age, weight_kg, bmi, updated_at)
+             VALUES (1, ?, ?, ?, ?, ?)`,
+            [
+              row[migraineYearsIdx],
+              row[ageIdx],
+              row[weightIdx] || null,
+              row[bmiIdx] || null,
+              row[updatedAtIdx]
+            ]
+          );
+        }
+        
+        await this.saveToIndexedDB();
+      }
+    } catch (error) {
+      console.warn('Migration check failed, will create fresh schema:', error);
+      // If migration fails, we'll just create a fresh schema
+    }
   }
 
   /**
@@ -146,7 +221,6 @@ class SQLiteService {
       CREATE TABLE IF NOT EXISTS personal_migraine_profile (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         migraine_history_years REAL NOT NULL,
-        menstrual_phase TEXT NOT NULL,
         age REAL NOT NULL,
         weight_kg REAL,
         bmi REAL,
@@ -542,18 +616,16 @@ class SQLiteService {
 
     this.db.run(
       `INSERT INTO personal_migraine_profile 
-       (id, migraine_history_years, menstrual_phase, age, weight_kg, bmi, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?)
+       (id, migraine_history_years, age, weight_kg, bmi, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          migraine_history_years = excluded.migraine_history_years,
-         menstrual_phase = excluded.menstrual_phase,
          age = excluded.age,
          weight_kg = excluded.weight_kg,
          bmi = excluded.bmi,
          updated_at = excluded.updated_at`,
       [
         profile.migraineHistoryYears,
-        profile.menstrualPhase,
         profile.age,
         profile.weightKg ?? null,
         profile.bmi ?? null,
@@ -569,7 +641,7 @@ class SQLiteService {
     if (!this.db) throw new Error('Database not initialized');
 
     const results = this.db.exec(
-      `SELECT migraine_history_years, menstrual_phase, age, weight_kg, bmi
+      `SELECT migraine_history_years, age, weight_kg, bmi
        FROM personal_migraine_profile WHERE id = 1`
     );
 
@@ -579,10 +651,9 @@ class SQLiteService {
 
     return {
       migraineHistoryYears: row[0] as number,
-      menstrualPhase: row[1] as PersonalMigraineProfile['menstrualPhase'],
-      age: row[2] as number,
-      weightKg: row[3] as number | null ?? undefined,
-      bmi: row[4] as number | null ?? undefined,
+      age: row[1] as number,
+      weightKg: row[2] as number | null ?? undefined,
+      bmi: row[3] as number | null ?? undefined,
     };
   }
 
