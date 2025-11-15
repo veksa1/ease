@@ -42,7 +42,7 @@ export function HomeScreenContainer({
   }, []);
 
   // Determine risk level from percentage
-  const riskPercentage = Math.round(risk * 100);
+  const riskPercentage = 100; // Math.round(risk * 100);
   const riskLevel: 'low' | 'moderate' | 'high' = 
     riskPercentage < 30 ? 'low' : 
     riskPercentage < 60 ? 'moderate' : 'high';
@@ -86,7 +86,7 @@ export function HomeScreenContainer({
 
   return (
     <HomeScreen
-      userName="Alex"
+      userName="Sarah"
       riskLevel={riskLevel}
       riskPercentage={riskPercentage}
       contextualAction={contextualAction}

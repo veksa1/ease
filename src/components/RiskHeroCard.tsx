@@ -30,7 +30,6 @@ export function RiskHeroCard({
   whatHelps = [],
   lowStimulationMode = false,
 }: RiskHeroCardProps) {
-  const [timeHorizon, setTimeHorizon] = useState<'6h' | 'today'>('6h');
   const [showDetails, setShowDetails] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(
     typeof window !== 'undefined' ? window.innerWidth : 375
@@ -109,29 +108,6 @@ export function RiskHeroCard({
           transform: 'translate(-30%, -30%)',
         }}
       />
-
-      <div className="absolute top-4 right-4 z-10">
-        <div className="flex gap-1 p-0.5 rounded-full bg-card/60 backdrop-blur-sm border border-border/40">
-          <button
-            onClick={() => setTimeHorizon('6h')}
-            className={`px-3 py-1.5 rounded-full text-label transition-all ${
-              timeHorizon === '6h' ? 'bg-primary/10 text-primary-600 dark:text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{ minWidth: '44px', minHeight: '32px' }}
-          >
-            6h
-          </button>
-          <button
-            onClick={() => setTimeHorizon('today')}
-            className={`px-3 py-1.5 rounded-full text-label transition-all ${
-              timeHorizon === 'today' ? 'bg-primary/10 text-primary-600 dark:text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            style={{ minWidth: '44px', minHeight: '32px' }}
-          >
-            Today
-          </button>
-        </div>
-      </div>
 
       <div className="relative z-10 flex flex-col items-center space-y-3 md:space-y-4">
         <GradientRiskGauge

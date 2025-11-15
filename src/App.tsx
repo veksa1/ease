@@ -18,7 +18,6 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
-import { DemoResetButton } from './components/DemoResetButton';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
@@ -566,9 +565,6 @@ export default function App() {
           />
         </>
       )}
-      
-      {/* Demo Reset Button */}
-      <DemoResetButton />
     </div>
   );
 }
