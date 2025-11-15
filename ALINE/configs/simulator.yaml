@@ -2,7 +2,7 @@
 # Ticket 004 - Bayesian / Markov Simulator for Synthetic Migraine Episodes
 
 # Dataset parameters
-n_users: 100  # Number of synthetic users (reduced for faster testing)
+n_users: 10000  # Number of synthetic users (reduced for faster testing)
 horizon: 365  # Days to simulate per user
 train_split: 0.8  # Train/val split ratio
 random_seed: 42
