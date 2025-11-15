@@ -161,6 +161,10 @@ def train_epoch(model, dataloader, optimizer, device, config):
         # Forward pass
         posterior, policy_scores = model(features)
         
+        # Log GPU memory on first batch
+        if batch_idx == 0 and device.type == 'cuda':
+            logger.info(f"After first batch - GPU memory allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
+        
         # Posterior loss
         loss_post = compute_posterior_loss(
             posterior, latents, 
@@ -311,6 +315,12 @@ def main():
     ).to(device)
     
     logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    
+    # Log GPU allocation
+    if device.type == 'cuda':
+        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+        logger.info(f"GPU memory allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
+        logger.info(f"GPU memory reserved: {torch.cuda.memory_reserved(0) / 1024**2:.2f} MB")
     
     # Optimizer
     optimizer = optim.Adam(
