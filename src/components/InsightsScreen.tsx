@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   Info,
@@ -12,6 +12,7 @@ import {
 import { Button } from './ui/button';
 import { BottomNav } from './BottomNav';
 import { useCorrelations } from '../hooks/useDemoData';
+import { sqliteService } from '../services/sqliteService';
 
 interface InsightsScreenProps {
   onBack?: () => void;
@@ -40,18 +41,14 @@ export function InsightsScreen({ onBack, onNavigate }: InsightsScreenProps) {
   // Load correlations from demo data
   const { loading, correlations } = useCorrelations();
   
-  // Experiment tracking (persisted to localStorage)
-  const [experimentDays, setExperimentDays] = useState<boolean[]>(() => {
-    const stored = localStorage.getItem('ease_experiment_hydration');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return [false, false, false, false, false, false, false];
-      }
-    }
-    return [false, false, false, false, false, false, false];
-  });
+  // Experiment tracking (persisted to SQLite)
+  const [experimentDays, setExperimentDays] = useState<boolean[]>([false, false, false, false, false, false, false]);
+  
+  useEffect(() => {
+    sqliteService.getExperimentDays('hydration').then(days => {
+      setExperimentDays(days);
+    });
+  }, []);
 
   const handleViewDetails = (correlation: CorrelationData) => {
     setSelectedCorrelation(correlation);
@@ -62,8 +59,8 @@ export function InsightsScreen({ onBack, onNavigate }: InsightsScreenProps) {
     const newDays = [...experimentDays];
     newDays[index] = !newDays[index];
     setExperimentDays(newDays);
-    // Save to localStorage
-    localStorage.setItem('ease_experiment_hydration', JSON.stringify(newDays));
+    // Save to SQLite
+    sqliteService.setExperimentDay('hydration', index, newDays[index]);
   };
 
   const completedDays = experimentDays.filter(Boolean).length;

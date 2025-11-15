@@ -12,6 +12,7 @@
  */
 
 import demoData from '../data/demoUserAlex.json';
+import { sqliteService } from './sqliteService';
 import type { 
   DemoDataset, 
   DailyPrediction, 
@@ -23,42 +24,13 @@ import type {
 
 class DemoDataService {
   private data: DemoDataset;
-  private userTimeline: Map<string, UserTimelineEntry[]>;
 
   constructor() {
     this.data = demoData as DemoDataset;
-    this.loadTimeline();
-  }
-
-  /**
-   * Load user timeline from localStorage
-   */
-  private loadTimeline() {
-    const stored = localStorage.getItem('ease_user_timeline');
-    if (stored) {
-      try {
-        const entries = JSON.parse(stored);
-        this.userTimeline = new Map(entries);
-      } catch {
-        this.userTimeline = new Map();
-      }
-    } else {
-      this.userTimeline = new Map();
-    }
-  }
-
-  /**
-   * Save timeline to localStorage
-   */
-  private saveTimeline() {
-    try {
-      localStorage.setItem(
-        'ease_user_timeline',
-        JSON.stringify(Array.from(this.userTimeline.entries()))
-      );
-    } catch (error) {
-      console.error('Failed to save timeline:', error);
-    }
+    // Initialize SQLite database
+    sqliteService.init().catch(err => {
+      console.error('Failed to initialize database:', err);
+    });
   }
 
   /**
@@ -116,26 +88,16 @@ class DemoDataService {
    * @param type Entry type
    * @param data Entry data
    */
-  addTimelineEntry(date: string, type: string, data: any) {
-    const dateKey = date.split('T')[0];
-    if (!this.userTimeline.has(dateKey)) {
-      this.userTimeline.set(dateKey, []);
-    }
-    this.userTimeline.get(dateKey)!.push({ 
-      type: type as any, 
-      data, 
-      timestamp: new Date().toISOString() 
-    });
-    this.saveTimeline();
+  async addTimelineEntry(date: string, type: string, data: any) {
+    await sqliteService.addTimelineEntry(date, type, data);
   }
 
   /**
    * Get timeline entries for a date
    * @param date ISO date string
    */
-  getTimelineEntries(date: string): UserTimelineEntry[] {
-    const dateKey = date.split('T')[0];
-    return this.userTimeline.get(dateKey) || [];
+  async getTimelineEntries(date: string): Promise<UserTimelineEntry[]> {
+    return await sqliteService.getTimelineEntries(date);
   }
 
   /**
@@ -153,14 +115,10 @@ class DemoDataService {
   }
 
   /**
-   * Reset demo (clear localStorage)
+   * Reset demo (clear database)
    */
-  resetDemo() {
-    localStorage.removeItem('ease_user_timeline');
-    localStorage.removeItem('ease_streak_count');
-    localStorage.removeItem('ease_experiments');
-    localStorage.removeItem('ease_has_seen_onboarding');
-    this.userTimeline.clear();
+  async resetDemo() {
+    await sqliteService.resetDatabase();
   }
 }
 

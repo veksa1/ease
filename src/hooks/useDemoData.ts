@@ -131,13 +131,15 @@ export function useTimeline(date: string) {
   const [entries, setEntries] = useState<UserTimelineEntry[]>([]);
 
   useEffect(() => {
-    const data = demoDataService.getTimelineEntries(date);
-    setEntries(data);
+    demoDataService.getTimelineEntries(date).then(data => {
+      setEntries(data);
+    });
   }, [date]);
 
-  const addEntry = (type: string, data: any) => {
-    demoDataService.addTimelineEntry(date, type, data);
-    setEntries(demoDataService.getTimelineEntries(date));
+  const addEntry = async (type: string, data: any) => {
+    await demoDataService.addTimelineEntry(date, type, data);
+    const updated = await demoDataService.getTimelineEntries(date);
+    setEntries(updated);
   };
 
   return { entries, addEntry };

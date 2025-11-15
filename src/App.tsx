@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Moon, Heart, Activity, MapPin, Calendar, Smartphone, Watch, Zap, Coffee, Droplets, Wind } from 'lucide-react';
+import { sqliteService } from './services/sqliteService';
 import { Button } from './components/ui/button';
 import { AccessibleSwitch } from './components/ui/accessible-switch';
 import { Label } from './components/ui/label';
@@ -23,9 +24,13 @@ export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
   
   // Check if user has seen onboarding
-  const [hasSeenOnboarding] = useState(() => {
-    return localStorage.getItem('ease_has_seen_onboarding') === 'true';
-  });
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  
+  useEffect(() => {
+    sqliteService.getSetting('has_seen_onboarding').then(value => {
+      setHasSeenOnboarding(value === 'true');
+    });
+  }, []);
   
   const [currentScreen, setCurrentScreen] = useState<string>(() => {
     // Skip onboarding if already seen
@@ -38,11 +43,16 @@ export default function App() {
   // Get risk prediction hook to update risk
   const { updateRiskWithQuickCheck } = useRiskPrediction();
   
-  // Get streak count from localStorage
-  const [streakCount, setStreakCount] = useState(() => {
-    const stored = localStorage.getItem('ease_streak_count');
-    return stored ? parseInt(stored, 10) : 7;
-  });
+  // Get streak count from SQLite
+  const [streakCount, setStreakCount] = useState(7);
+  
+  useEffect(() => {
+    sqliteService.getSetting('streak_count').then(value => {
+      if (value) {
+        setStreakCount(parseInt(value, 10));
+      }
+    });
+  }, []);
   
   // Consent state
   const [consents, setConsents] = useState({
@@ -90,7 +100,7 @@ export default function App() {
   };
 
   const handleOnboardingComplete = () => {
-    localStorage.setItem('ease_has_seen_onboarding', 'true');
+    sqliteService.setSetting('has_seen_onboarding', 'true');
     setCurrentScreen('home');
   };
 
@@ -526,7 +536,7 @@ export default function App() {
             // Increment and save streak
             const newStreak = streakCount + 1;
             setStreakCount(newStreak);
-            localStorage.setItem('ease_streak_count', newStreak.toString());
+            sqliteService.setSetting('streak_count', newStreak.toString());
             
             // Return to home
             setCurrentScreen('home');

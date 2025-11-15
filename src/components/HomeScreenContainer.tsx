@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { Coffee, Moon, Activity, Heart } from 'lucide-react';
 import { HomeScreen } from './HomeScreen';
 import { useRiskPrediction, useTodayMetrics } from '../hooks/useDemoData';
+import { sqliteService } from '../services/sqliteService';
 
 interface HomeScreenContainerProps {
   onQuickCheckClick?: () => void;
@@ -29,11 +30,16 @@ export function HomeScreenContainer({
   // Get today's metrics
   const metrics = useTodayMetrics();
   
-  // Get streak count from localStorage
-  const [streakCount, setStreakCount] = useState(() => {
-    const stored = localStorage.getItem('ease_streak_count');
-    return stored ? parseInt(stored, 10) : 7;
-  });
+  // Get streak count from SQLite
+  const [streakCount, setStreakCount] = useState(7);
+  
+  useEffect(() => {
+    sqliteService.getSetting('streak_count').then(value => {
+      if (value) {
+        setStreakCount(parseInt(value, 10));
+      }
+    });
+  }, []);
 
   // Determine risk level from percentage
   const riskPercentage = Math.round(risk * 100);

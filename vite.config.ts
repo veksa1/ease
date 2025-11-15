@@ -51,7 +51,7 @@
     },
     build: {
       target: 'es2020',
-      outDir: 'build',
+      outDir: 'dist',
       // Code splitting for better performance
       rollupOptions: {
         output: {
