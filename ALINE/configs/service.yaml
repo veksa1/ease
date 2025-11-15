@@ -1,0 +1,51 @@
+# FastAPI Service Configuration - Ticket 010
+
+# Model configuration
+model:
+  checkpoint_path: runs/checkpoints/best.pt
+  config_path: configs/model.yaml
+  device: auto  # 'cuda', 'cpu', or 'auto'
+
+# Migraine prediction model (from simulator)
+migraine_model:
+  weights: [0.5, 0.4, 0.45, 0.35]
+  bias: -1.8
+
+# Policy configuration
+policy:
+  default_k: 3  # Default number of hours to select
+  lambda1: 1.0  # Weight for entropy
+  lambda2: 0.5  # Weight for uncertainty
+  lambda3: 0.3  # Weight for gradient
+
+# Server configuration
+server:
+  host: 0.0.0.0
+  port: 8000
+  reload: false
+  workers: 1
+
+# Feature configuration
+features:
+  n_features: 20
+  feature_names:
+    - Sleep Duration (hours)
+    - Sleep Quality (1-10)
+    - Sleep Consistency Score
+    - Stress Level (1-10)
+    - Work Hours
+    - Anxiety Score (1-10)
+    - Caffeine Intake (mg)
+    - Water Intake (L)
+    - Meal Regularity (1-10)
+    - Exercise Duration (min)
+    - Physical Activity Level (1-10)
+    - Neck Tension (1-10)
+    - Screen Time (hours)
+    - Weather Pressure (hPa)
+    - Noise Level (dB)
+    - Hormone Fluctuation Index
+    - Menstrual Cycle Day
+    - Alcohol Consumption (units)
+    - Smoking (cigarettes/day)
+    - Meditation Time (min)
