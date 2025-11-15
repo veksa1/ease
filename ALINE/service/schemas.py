@@ -78,3 +78,39 @@ class PolicyResponse(BaseModel):
     selected_hours: List[SelectedHour]
     k: int
     timestamp: str
+
+
+# Calendar integration endpoints (Ticket 019)
+class CalendarConnectionRequest(BaseModel):
+    """Request to save calendar connection"""
+    userId: str = Field(..., description="User ID")
+    calendarUrl: str = Field(..., description="ICS/WebCal URL")
+
+
+class CalendarConnectionResponse(BaseModel):
+    """Response after saving calendar connection"""
+    status: str
+    userId: str
+    lastVerifiedAt: Optional[str] = None
+    message: Optional[str] = None
+
+
+class CalendarStatusResponse(BaseModel):
+    """Response with calendar connection status"""
+    connected: bool
+    userId: str
+    lastVerifiedAt: Optional[str] = None
+
+
+class ContextGenerationRequest(BaseModel):
+    """Request for generating context from calendar"""
+    userId: str = Field(..., description="User ID")
+    priors: dict = Field(..., description="Prior distributions for features")
+
+
+class ContextGenerationResponse(BaseModel):
+    """Response with generated posteriors"""
+    userId: str
+    posteriors: dict = Field(..., description="Updated posterior distributions")
+    features: List[dict] = Field(..., description="Feature details with prior/posterior")
+    timestamp: str

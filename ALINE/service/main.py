@@ -35,8 +35,15 @@ from service.schemas import (
     HourlyPosterior,
     PolicyRequest,
     PolicyResponse,
-    SelectedHour
+    SelectedHour,
+    CalendarConnectionRequest,
+    CalendarConnectionResponse,
+    CalendarStatusResponse,
+    ContextGenerationRequest,
+    ContextGenerationResponse
 )
+from service.database import db
+from service.calendar import calendar_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -305,6 +312,147 @@ async def policy_topk(request: PolicyRequest):
     
     except Exception as e:
         logger.error(f"Error in policy_topk: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Calendar Integration Endpoints (Ticket 019)
+# ============================================================================
+
+@app.post("/user/calendar", response_model=CalendarConnectionResponse)
+async def save_calendar_connection(request: CalendarConnectionRequest):
+    """
+    Save user's calendar ICS/WebCal URL
+    
+    Validates the URL and stores it for future context generation.
+    """
+    try:
+        # Validate and normalize URL
+        validation_result = await calendar_service.validate_and_normalize(request.calendarUrl)
+        
+        if not validation_result['valid']:
+            raise HTTPException(
+                status_code=400,
+                detail=validation_result['error']
+            )
+        
+        # Save to database
+        connection = db.save_calendar_connection(
+            user_id=request.userId,
+            calendar_url=request.calendarUrl,
+            normalized_url=validation_result['normalizedUrl']
+        )
+        
+        # Update verification timestamp
+        db.update_verification_time(request.userId)
+        
+        return CalendarConnectionResponse(
+            status="ok",
+            userId=request.userId,
+            lastVerifiedAt=connection['updatedAt'],
+            message="Calendar connected successfully"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving calendar connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/user/calendar/{user_id}", response_model=CalendarStatusResponse)
+async def get_calendar_status(user_id: str):
+    """
+    Get calendar connection status for a user
+    """
+    try:
+        connection = db.get_calendar_connection(user_id)
+        
+        if connection:
+            return CalendarStatusResponse(
+                connected=True,
+                userId=user_id,
+                lastVerifiedAt=connection.get('lastVerifiedAt')
+            )
+        else:
+            return CalendarStatusResponse(
+                connected=False,
+                userId=user_id
+            )
+    
+    except Exception as e:
+        logger.error(f"Error getting calendar status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/user/calendar/{user_id}")
+async def delete_calendar_connection(user_id: str):
+    """
+    Delete calendar connection for a user
+    """
+    try:
+        deleted = db.delete_calendar_connection(user_id)
+        
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Calendar connection not found")
+        
+        return {"status": "ok", "message": "Calendar connection deleted"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting calendar connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/aline/generate-context", response_model=ContextGenerationResponse)
+async def generate_context(request: ContextGenerationRequest):
+    """
+    Generate context posteriors from calendar and priors
+    
+    Sends calendar URL and prior distributions to n8n workflow,
+    which analyzes calendar events and returns updated posteriors.
+    """
+    try:
+        # Get user's calendar connection
+        connection = db.get_calendar_connection(request.userId)
+        
+        if not connection:
+            raise HTTPException(
+                status_code=404,
+                detail="No calendar connected for this user"
+            )
+        
+        # Get n8n webhook URL from config
+        n8n_url = app_state['config'].get('n8n', {}).get('webhook_url')
+        if not n8n_url:
+            raise HTTPException(
+                status_code=500,
+                detail="n8n webhook URL not configured"
+            )
+        
+        # Call n8n workflow
+        result = await calendar_service.generate_context_with_calendar(
+            user_id=request.userId,
+            calendar_url=connection['normalizedUrl'],
+            priors=request.priors,
+            n8n_webhook_url=n8n_url
+        )
+        
+        # Update verification timestamp
+        db.update_verification_time(request.userId)
+        
+        return ContextGenerationResponse(
+            userId=request.userId,
+            posteriors=result.get('posteriors', {}),
+            features=result.get('features', []),
+            timestamp=datetime.now().isoformat()
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating context: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

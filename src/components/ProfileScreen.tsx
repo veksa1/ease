@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Calendar,
 } from 'lucide-react';
 import { BottomNav } from './BottomNav';
 import { AccessibleSwitch } from './ui/accessible-switch';
@@ -22,6 +23,7 @@ import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { ShareWithClinicianFlow } from './ShareWithClinicianFlow';
+import { CalendarIntegration } from './CalendarIntegration';
 
 interface ProfileScreenProps {
   onBack?: () => void;
@@ -36,6 +38,7 @@ export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScr
   const [onDeviceModel, setOnDeviceModel] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareFlow, setShowShareFlow] = useState(false);
+  const [showCalendarIntegration, setShowCalendarIntegration] = useState(false);
 
   const handleCopyLink = () => {
     setCopiedLink(true);
@@ -147,11 +150,22 @@ export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScr
               </div>
               <button
                 onClick={onDevicesClick}
-                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
                 style={{ minHeight: '44px' }}
               >
                 <span className="text-[#6A67D8]">Manage connections</span>
                 <ChevronRight className="w-5 h-5 text-[#6A67D8]" />
+              </button>
+              <button
+                onClick={() => setShowCalendarIntegration(true)}
+                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                style={{ minHeight: '44px' }}
+              >
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-gray-400" />
+                  <span className="text-gray-900">Calendar integration</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
               </button>
             </div>
           </section>
@@ -364,6 +378,18 @@ export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScr
       {/* Share with Clinician Flow Modal */}
       {showShareFlow && (
         <ShareWithClinicianFlow onClose={() => setShowShareFlow(false)} />
+      )}
+
+      {/* Calendar Integration Modal */}
+      {showCalendarIntegration && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <CalendarIntegration 
+              userId="demo-user" 
+              onClose={() => setShowCalendarIntegration(false)} 
+            />
+          </div>
+        </div>
       )}
     </div>
   );

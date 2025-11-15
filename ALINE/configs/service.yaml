@@ -25,6 +25,10 @@ server:
   reload: false
   workers: 1
 
+# n8n integration (Ticket 019)
+n8n:
+  webhook_url: ${N8N_WEBHOOK_URL:http://localhost:5678/webhook/aline-context}
+
 # Feature configuration
 features:
   n_features: 20
