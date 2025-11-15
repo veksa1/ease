@@ -37,7 +37,52 @@ Automatically fetch real-time weather data to populate environmental features (b
 
 ## 🧩 Tasks
 
-### 1. Set Up OpenWeather Account
+### 1. Location Strategy - Calendar-Based Inference ✅
+
+**DECISION:** Use calendar events to infer geographical location!
+
+**How it works:**
+1. Parse location data from ICS calendar events (LOCATION field)
+2. Geocode location → lat/lon coordinates
+3. Use lat/lon for OpenWeather API calls
+4. Fallback: Manual zip code entry if no calendar location
+
+**Benefits:**
+- No browser geolocation permission needed
+- Works for future trips (calendar has tomorrow's location)
+- Respects user privacy (location from their own calendar)
+
+**File:** `service/location_inference.py` (NEW)
+
+```python
+from ics import Calendar
+import requests
+
+def infer_location_from_calendar(calendar_url: str, date: str) -> tuple[float, float]:
+    """
+    Extract location from calendar events and geocode to lat/lon.
+    
+    Returns: (latitude, longitude) or None
+    """
+    # Parse ICS
+    events = parse_calendar_events(calendar_url, date)
+    
+    # Find events with location
+    for event in events:
+        if event.location:
+            # Geocode using OpenStreetMap Nominatim (free)
+            lat, lon = geocode_location(event.location)
+            if lat and lon:
+                return lat, lon
+    
+    return None
+```
+
+**Integration Point:** n8n workflow can extract location and pass to weather service
+
+---
+
+### 2. Set Up OpenWeather Account
 
 **Action Items:**
 - Sign up at https://openweathermap.org/api
@@ -58,22 +103,55 @@ OPENWEATHER_API_KEY=your_api_key_here
 OPENWEATHER_CACHE_TTL=3600  # 1 hour cache
 ```
 
-### 2. Create Weather Service Module
+### 3. Caching Strategy - SQLite ✅
+
+**DECISION:** Use SQLite for weather data caching (matches existing pattern)
+
+**Database Schema:**
+
+```sql
+CREATE TABLE weather_cache (
+    location_key TEXT PRIMARY KEY,  -- "lat,lon" as key
+    timestamp INTEGER NOT NULL,
+    temperature REAL,
+    pressure REAL,
+    pressure_change_3h REAL,
+    humidity REAL,
+    aqi INTEGER,
+    weather_data JSON,  -- Full API response
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_expires ON weather_cache(expires_at);
+```
+
+**Benefits:**
+- Survives backend restarts
+- Can set TTL per record
+- Easy to query historical weather
+- Matches calendar integration pattern
+
+---
+
+### 4. Create Weather Service Module
 
 **File:** `service/weather.py`
 
 ```python
 import httpx
 import os
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 class WeatherService:
     """
     OpenWeather API client for fetching environmental data.
+    Uses SQLite caching to minimize API calls.
     
     API Documentation: https://openweathermap.org/api/one-call-3
     """
@@ -82,9 +160,10 @@ class WeatherService:
     API_KEY = os.getenv("OPENWEATHER_API_KEY")
     CACHE_TTL = int(os.getenv("OPENWEATHER_CACHE_TTL", 3600))
     
-    def __init__(self):
-        self.cache = {}  # Simple in-memory cache {(lat, lon): (timestamp, data)}
+    def __init__(self, db_path: str = "data/aline.db"):
+        self.db_path = db_path
         self.client = httpx.AsyncClient(timeout=10.0)
+        self._init_cache_table()
     
     async def get_current_weather(
         self, 

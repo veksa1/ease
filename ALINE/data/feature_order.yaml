@@ -1,0 +1,248 @@
+# Feature Order Configuration - Canonical Ordering for ALINE Model
+# DO NOT REORDER - Model weights depend on this exact sequence
+# Total: 35 features (indices 0-34)
+
+# Generated: 2025-11-16
+# Model input dimension: 35
+
+features:
+  # ============================================================================
+  # BASE FEATURES (0-19) - Original 20 features
+  # ============================================================================
+  
+  0:
+    name: "Sleep Duration (hours)"
+    category: "Biometrics"
+    unit: "hours"
+    weight_prior: 1.0
+    
+  1:
+    name: "Sleep Quality (1-10)"
+    category: "Biometrics"
+    unit: "scale"
+    weight_prior: 1.0
+    
+  2:
+    name: "Sleep Consistency Score"
+    category: "Biometrics"
+    unit: "scale"
+    weight_prior: 0.6
+    
+  3:
+    name: "Stress Level (1-10)"
+    category: "Manual"
+    unit: "scale"
+    weight_prior: 1.0
+    
+  4:
+    name: "Work Hours"
+    category: "Manual"
+    unit: "hours"
+    weight_prior: 0.6
+    
+  5:
+    name: "Anxiety Score (1-10)"
+    category: "Manual"
+    unit: "scale"
+    weight_prior: 0.7
+    
+  6:
+    name: "Caffeine Intake (mg)"
+    category: "Manual"
+    unit: "mg"
+    weight_prior: 0.8
+    
+  7:
+    name: "Water Intake (L)"
+    category: "Manual"
+    unit: "liters"
+    weight_prior: 0.6
+    
+  8:
+    name: "Meal Regularity (1-10)"
+    category: "Manual"
+    unit: "scale"
+    weight_prior: 0.6
+    
+  9:
+    name: "Exercise Duration (min)"
+    category: "Biometrics"
+    unit: "minutes"
+    weight_prior: 0.6
+    
+  10:
+    name: "Physical Activity Level (1-10)"
+    category: "Biometrics"
+    unit: "scale"
+    weight_prior: 0.6
+    
+  11:
+    name: "Neck Tension (1-10)"
+    category: "Manual"
+    unit: "scale"
+    weight_prior: 0.7
+    
+  12:
+    name: "Screen Time (hours)"
+    category: "Automatic"
+    unit: "hours"
+    weight_prior: 0.6
+    
+  13:
+    name: "Weather Pressure (hPa)"
+    category: "Environment"
+    unit: "hPa"
+    weight_prior: 0.6
+    
+  14:
+    name: "Noise Level (dB)"
+    category: "Environment"
+    unit: "dB"
+    weight_prior: 0.5
+    
+  15:
+    name: "Hormone Fluctuation Index"
+    category: "Biometrics"
+    unit: "scale"
+    weight_prior: 0.7
+    
+  16:
+    name: "Menstrual Cycle Day"
+    category: "Biometrics"
+    unit: "day"
+    weight_prior: 1.0
+    
+  17:
+    name: "Alcohol Consumption (units)"
+    category: "Manual"
+    unit: "units"
+    weight_prior: 0.6
+    
+  18:
+    name: "Smoking (cigarettes/day)"
+    category: "Manual"
+    unit: "count"
+    weight_prior: 0.5
+    
+  19:
+    name: "Meditation Time (min)"
+    category: "Manual"
+    unit: "minutes"
+    weight_prior: 0.4
+    
+  # ============================================================================
+  # TEMPORAL FEATURES (20-23) - Ticket 020
+  # ============================================================================
+  
+  20:
+    name: "day_of_week_sin"
+    category: "Temporal"
+    unit: "cyclical"
+    weight_prior: 0.5
+    
+  21:
+    name: "day_of_week_cos"
+    category: "Temporal"
+    unit: "cyclical"
+    weight_prior: 0.5
+    
+  22:
+    name: "week_of_year_sin"
+    category: "Temporal"
+    unit: "cyclical"
+    weight_prior: 0.4
+    
+  23:
+    name: "week_of_year_cos"
+    category: "Temporal"
+    unit: "cyclical"
+    weight_prior: 0.4
+    
+  # ============================================================================
+  # EXPANDED FEATURES (24-34) - Ticket 025
+  # From migraine_features.json with high weight_prior
+  # ============================================================================
+  
+  24:
+    name: "HRV"
+    category: "Biometrics"
+    unit: "ms"
+    weight_prior: 1.0
+    description: "Heart Rate Variability (SDNN)"
+    
+  25:
+    name: "Resting Heart Rate"
+    category: "Biometrics"
+    unit: "bpm"
+    weight_prior: 0.6
+    
+  26:
+    name: "Body Temperature Change"
+    category: "Biometrics"
+    unit: "°C"
+    weight_prior: 0.7
+    description: "Change from baseline"
+    
+  27:
+    name: "Barometric Pressure Change"
+    category: "Environment"
+    unit: "hPa"
+    weight_prior: 1.0
+    description: "Change over 3 hours"
+    
+  28:
+    name: "Air Quality Index"
+    category: "Environment"
+    unit: "AQI"
+    weight_prior: 0.6
+    
+  29:
+    name: "Altitude"
+    category: "Environment"
+    unit: "meters"
+    weight_prior: 0.6
+    
+  30:
+    name: "Prodrome Symptoms"
+    category: "Manual"
+    unit: "scale"
+    weight_prior: 1.0
+    description: "Yawning, neck stiffness, mood changes"
+    
+  31:
+    name: "Age"
+    category: "Demographics"
+    unit: "years"
+    weight_prior: 0.6
+    
+  32:
+    name: "Body Weight"
+    category: "Demographics"
+    unit: "kg"
+    weight_prior: 0.4
+    
+  33:
+    name: "BMI"
+    category: "Demographics"
+    unit: "kg/m²"
+    weight_prior: 0.6
+    
+  34:
+    name: "Migraine History Years"
+    category: "Medical"
+    unit: "years"
+    weight_prior: 1.0
+    description: "Years since first migraine"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  total_features: 35
+  base_features: 20
+  temporal_features: 4
+  expanded_features: 11
+  model_version: "v2.0-35feature"
+  created: "2025-11-16"
+  tickets: ["020", "025"]

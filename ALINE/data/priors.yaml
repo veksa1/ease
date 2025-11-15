@@ -207,6 +207,37 @@ Prodrome Symptoms:
   max: 10.0
 
 # ============================================================================
+# BIOMETRIC FEATURES - EXPANDED (Ticket 025)
+# ============================================================================
+
+HRV:
+  description: "Heart Rate Variability (SDNN) in milliseconds"
+  dist: lognormal
+  mu_ln: 3.9  # exp(3.9) ≈ 50 ms
+  sigma_ln: 0.5
+  min: 20.0
+  max: 200.0
+  migraine_impact: "High - decreases 12-24h before migraine"
+
+Resting Heart Rate:
+  description: "Resting heart rate in beats per minute"
+  dist: normal
+  mu: 70.0
+  sigma: 12.0
+  min: 40.0
+  max: 120.0
+  migraine_impact: "Medium - increases during prodrome"
+
+Body Temperature Change:
+  description: "Change from baseline body temperature in °C"
+  dist: normal
+  mu: 0.0
+  sigma: 0.5
+  min: -2.0
+  max: 2.0
+  migraine_impact: "High - often elevated 6-12h before"
+
+# ============================================================================
 # DEMOGRAPHIC FEATURES (Ticket 025)
 # ============================================================================
 

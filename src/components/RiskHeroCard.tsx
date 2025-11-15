@@ -45,11 +45,11 @@ export function RiskHeroCard({
   const gaugeStroke = gaugeSize < 150 ? 12 : 14;
 
   const getInfluenceColor = (pct: number) => {
-    if (pct >= 20) return 'text-white dark:text-white';
-    if (pct >= 15) return 'text-white dark:text-white';
-    if (pct >= 10) return 'text-gray-900 dark:text-gray-900';
-    if (pct >= 5) return 'text-gray-900 dark:text-gray-900';
-    return 'text-white dark:text-white';
+    if (pct >= 20) return 'text-black dark:text-black';
+    if (pct >= 15) return 'text-black dark:text-black';
+    if (pct >= 10) return 'text-black dark:text-black';
+    if (pct >= 5) return 'text-black dark:text-black';
+    return 'text-black dark:text-black';
   };
 
   const getInfluenceBackground = (pct: number) => {
@@ -61,11 +61,11 @@ export function RiskHeroCard({
   };
 
   const getPercentageBadgeColor = (pct: number) => {
-    if (pct >= 20) return 'bg-red-500 text-white';
-    if (pct >= 15) return 'bg-orange-500 text-white';
-    if (pct >= 10) return 'bg-yellow-300 text-gray-900';
-    if (pct >= 5) return 'bg-lime-300 text-gray-900';
-    return 'bg-emerald-400 text-gray-900';
+    if (pct >= 20) return 'bg-red-500 text-black';
+    if (pct >= 15) return 'bg-orange-500 text-black';
+    if (pct >= 10) return 'bg-yellow-300 text-black';
+    if (pct >= 5) return 'bg-lime-300 text-black';
+    return 'bg-emerald-400 text-black';
   };
 
   const groupedContributors = riskVariables
@@ -177,7 +177,7 @@ export function RiskHeroCard({
                               className={`inline-flex items-center justify-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-md shadow-sm ${getPercentageBadgeColor(variable.percentage)}`}
                               style={{ borderRadius: '8px', minWidth: '56px' }}
                             >
-                              <span className="text-xs md:text-sm font-semibold">
+                              <span className="text-xs md:text-sm font-semibold text-black">
                                 {variable.percentage}%
                               </span>
                             </span>

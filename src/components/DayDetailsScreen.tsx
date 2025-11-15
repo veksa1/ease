@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   Moon,
@@ -15,7 +15,9 @@ import {
 import { MiniLineChart } from './MiniLineChart';
 import { Button } from './ui/button';
 import { PillChip } from './PillChip';
-import { useHourlyRisk } from '../hooks/useDemoData';
+import { useHourlyRisk, useTimeline } from '../hooks/useDemoData';
+import { useHourlyPosterior } from '../hooks/useHourlyPosterior';
+import type { QuickCheckData } from '../services/featureConverter';
 
 interface DayDetailsScreenProps {
   date: Date;
@@ -42,15 +44,34 @@ type Correlation = {
 
 export function DayDetailsScreen({ date, dayNumber, onBack, onExportPDF }: DayDetailsScreenProps) {
   const [showMethodology, setShowMethodology] = useState(false);
+  const [quickCheckData, setQuickCheckData] = useState<QuickCheckData | undefined>(undefined);
 
-  // Fetch real hourly risk data for this date
+  // Fetch timeline entries for this specific date
   const dateString = date.toISOString().split('T')[0];
-  const { loading: loadingHourlyRisk, hourlyData } = useHourlyRisk(dateString);
+  const { entries } = useTimeline(dateString);
+
+  // Extract Quick Check data from timeline for this day
+  useEffect(() => {
+    const quickCheckEntry = entries.find(e => e.type === 'quick_check');
+    if (quickCheckEntry && quickCheckEntry.data) {
+      setQuickCheckData(quickCheckEntry.data as QuickCheckData);
+    }
+  }, [entries]);
+
+  // Fetch hourly posterior using the actual Quick Check data from that day
+  const { loading: loadingPosterior, hourlyData } = useHourlyPosterior(quickCheckData);
+
+  // Fallback to demo hourly risk data if no Quick Check data available
+  const { loading: loadingDemoRisk, hourlyData: demoHourlyData } = useHourlyRisk(dateString);
+
+  // Determine which data source to use
+  const loading = quickCheckData ? loadingPosterior : loadingDemoRisk;
+  const actualHourlyData = quickCheckData ? hourlyData : demoHourlyData;
 
   // Convert hourly risk data to chart data (0-100 scale)
-  const predictionData = loadingHourlyRisk
+  const predictionData = loading
     ? Array(24).fill(0).map((_, i) => 25 + Math.random() * 50) // Loading placeholder
-    : hourlyData.map(h => h.risk * 100); // Real data from backend
+    : actualHourlyData.map(h => h.risk * 100); // Real data from backend or demo
 
   // Fallback to mock data if no hourly data available
   const chartData = predictionData.length === 24
