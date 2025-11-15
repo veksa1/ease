@@ -182,14 +182,20 @@ export function HomeScreen({
             lowStimulationMode={lowStimulationMode}
           />
 
-          {/* Primary CTA */}
+          {/* Primary CTA - Quick Check moved to top */}
           <Button
-            onClick={onSootheModeClick}
-            className="w-full h-12 gap-2"
+            onClick={onQuickCheckClick}
+            className="w-full h-12 gap-2 relative"
             style={{ borderRadius: '12px' }}
           >
-            <ContextualIcon className="w-5 h-5" />
-            {contextualAction.label}
+            <HelpCircle className="w-5 h-5" />
+            Quick check
+            {streakCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-foreground text-label border border-border">
+                <Flame className="w-3 h-3" />
+                {streakCount}
+              </span>
+            )}
           </Button>
 
           {/* Secondary Actions */}
@@ -208,21 +214,15 @@ export function HomeScreen({
               }
             />
 
-            {/* Quick Check */}
+            {/* Keep up the good habits - moved to secondary */}
             <Button
               variant="outline"
-              className="h-12 relative"
+              className="h-12 gap-2"
               style={{ borderRadius: '12px' }}
-              onClick={onQuickCheckClick}
+              onClick={onSootheModeClick}
             >
-              <HelpCircle className="w-4 h-4" />
-              Quick check
-              {streakCount > 0 && (
-                <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-label">
-                  <Flame className="w-3 h-3" />
-                  {streakCount}
-                </span>
-              )}
+              <ContextualIcon className="w-4 h-4" />
+              <span className="truncate">{contextualAction.label}</span>
             </Button>
           </div>
 
