@@ -2,28 +2,28 @@ import React from 'react';
 import { Home, BookOpen, User } from 'lucide-react';
 
 interface BottomNavProps {
-  activeIndex?: number;
-  onNavigate?: (index: number) => void;
+  activeTab?: 'home' | 'diary' | 'profile';
+  onNavigate?: (tab: 'home' | 'diary' | 'profile') => void;
 }
 
-export function BottomNav({ activeIndex = 0, onNavigate }: BottomNavProps) {
+export function BottomNav({ activeTab = 'home', onNavigate }: BottomNavProps) {
   const items = [
-    { icon: Home, label: 'Home' },
-    { icon: BookOpen, label: 'Diary' },
-    { icon: User, label: 'Profile' },
+    { icon: Home, label: 'Home', id: 'home' as const },
+    { icon: BookOpen, label: 'Diary', id: 'diary' as const },
+    { icon: User, label: 'Profile', id: 'profile' as const },
   ];
 
   return (
-    <div className="w-full bg-card border-t border-border">
+    <div className="fixed bottom-0 left-0 right-0 w-full bg-card border-t border-border z-40">
       <div className="flex items-center justify-around px-4 py-2">
-        {items.map((item, index) => {
+        {items.map((item) => {
           const Icon = item.icon;
-          const isActive = index === activeIndex;
+          const isActive = item.id === activeTab;
           
           return (
             <button
-              key={index}
-              onClick={() => onNavigate?.(index)}
+              key={item.id}
+              onClick={() => onNavigate?.(item.id)}
               className={`
                 flex flex-col items-center gap-1 py-2 px-6 transition-colors duration-200
                 ${isActive ? 'text-primary' : 'text-muted-foreground'}

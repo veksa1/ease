@@ -46,6 +46,7 @@ interface HomeScreenProps {
     screenTime: string;
     upcomingStressor?: string;
   };
+  onQuickCheckClick?: () => void; // optional handler for Quick check action
 }
 
 export function HomeScreen({
@@ -55,6 +56,7 @@ export function HomeScreen({
   contextualAction,
   streakCount,
   todayData,
+  onQuickCheckClick,
 }: HomeScreenProps) {
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -208,6 +210,7 @@ export function HomeScreen({
               variant="outline"
               className="h-12 rounded-lg relative"
               style={{ borderRadius: '8px' }}
+              onClick={onQuickCheckClick}
             >
               <HelpCircle className="w-4 h-4" />
               Quick check
