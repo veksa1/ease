@@ -45,5 +45,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=60s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Run the FastAPI service using the main.py entry point which respects PORT env var
+# Run the FastAPI service using uv to ensure correct Python environment
 CMD ["uv", "run", "python", "-m", "service.main"]

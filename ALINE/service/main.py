@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import torch
 import yaml
 import logging
@@ -139,11 +140,33 @@ def load_model_and_config():
         raise
 
 
-# Initialize FastAPI app
+# Lifespan event handler
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    # Startup
+    import os
+    logger.info(f"Starting ALINE service on port {os.getenv('PORT', '8000')}")
+    logger.info(f"Host: {os.getenv('HOST', '0.0.0.0')}")
+    try:
+        load_model_and_config()
+        logger.info("✓ Startup completed successfully")
+    except Exception as e:
+        logger.error(f"✗ Startup failed: {e}", exc_info=True)
+        raise
+    
+    yield
+    
+    # Shutdown (cleanup if needed)
+    logger.info("Shutting down ALINE service")
+
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="ALINE Migraine Prediction API",
     description="API for daily migraine risk prediction with active querying policy",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -154,20 +177,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Load model on startup"""
-    import os
-    logger.info(f"Starting ALINE service on port {os.getenv('PORT', '8000')}")
-    logger.info(f"Host: {os.getenv('HOST', '0.0.0.0')}")
-    try:
-        load_model_and_config()
-        logger.info("✓ Startup completed successfully")
-    except Exception as e:
-        logger.error(f"✗ Startup failed: {e}", exc_info=True)
-        raise
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -495,12 +504,13 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
     
     # Use PORT env var if available (for Cloud Run compatibility)
-    port = int(os.getenv('PORT', config['server']['port']))
+    host = "0.0.0.0"
+    port = int(os.getenv("PORT", config["server"]["port"]))
     
     uvicorn.run(
-        "main:app",
-        host=config['server']['host'],
+        "service.main:app",   # <-- CORRECT MODULE PATH
+        host=host,
         port=port,
-        reload=config['server']['reload'],
-        workers=config['server']['workers']
+        reload=False,
+        workers=1
     )
