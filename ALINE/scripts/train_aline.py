@@ -34,9 +34,12 @@ logger = logging.getLogger(__name__)
 class MigraineDataset(Dataset):
     """Dataset for hourly migraine prediction with 24-hour windows"""
     
-    def __init__(self, csv_path, sequence_length=24):
+    def __init__(self, csv_path, sequence_length=24, max_sequences=None):
         self.sequence_length = sequence_length
+        
+        logger.info(f"Loading data from {csv_path}...")
         self.df = pd.read_csv(csv_path)
+        logger.info(f"Loaded {len(self.df)} rows")
         
         # Feature columns (exclude meta and target columns)
         feature_cols = [col for col in self.df.columns if col not in [
@@ -50,19 +53,30 @@ class MigraineDataset(Dataset):
         self.feature_cols = feature_cols
         self.latent_cols = latent_cols
         
-        # Group by user to create sequences
+        logger.info(f"Creating sequences (this may take a while for large datasets)...")
+        
+        # Group by user to create sequences - optimized version
         self.sequences = []
-        for user_id in self.df['user_id'].unique():
-            user_df = self.df[self.df['user_id'] == user_id].sort_values('day')
+        user_ids = self.df['user_id'].unique()
+        logger.info(f"Processing {len(user_ids)} users...")
+        
+        for idx, user_id in enumerate(user_ids):
+            if idx % 100 == 0:
+                logger.info(f"  Processed {idx}/{len(user_ids)} users, {len(self.sequences)} sequences created")
+            
+            user_df = self.df[self.df['user_id'] == user_id].sort_values('day').reset_index(drop=True)
             
             # Create sliding windows of 24 hours
             for i in range(len(user_df) - sequence_length):
-                window = user_df.iloc[i:i+sequence_length]
+                # Early exit if we've reached max_sequences
+                if max_sequences and len(self.sequences) >= max_sequences:
+                    logger.info(f"Reached max_sequences limit of {max_sequences}")
+                    break
                 
-                features = window[feature_cols].values
-                latents = window[latent_cols].values
-                migraine_next = user_df.iloc[i+sequence_length]['migraine']
-                migraine_prob_next = user_df.iloc[i+sequence_length]['migraine_prob']
+                features = user_df.loc[i:i+sequence_length-1, feature_cols].values
+                latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
+                migraine_next = user_df.loc[i+sequence_length, 'migraine']
+                migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
                 
                 self.sequences.append({
                     'features': features,
@@ -70,8 +84,11 @@ class MigraineDataset(Dataset):
                     'migraine_next': migraine_next,
                     'migraine_prob_next': migraine_prob_next
                 })
+            
+            if max_sequences and len(self.sequences) >= max_sequences:
+                break
         
-        logger.info(f"Created {len(self.sequences)} sequences from {len(self.df['user_id'].unique())} users")
+        logger.info(f"Created {len(self.sequences)} sequences from {len(user_ids)} users")
     
     def __len__(self):
         return len(self.sequences)
@@ -269,12 +286,18 @@ def main():
     torch.manual_seed(config['seed'])
     np.random.seed(config['seed'])
     
-    # Device
+    # Device - log this FIRST to confirm CUDA detection
     if config['device'] == 'auto':
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
         device = torch.device(config['device'])
+    
+    logger.info("="*60)
     logger.info(f"Using device: {device}")
+    if device.type == 'cuda':
+        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+        logger.info(f"CUDA Version: {torch.version.cuda}")
+    logger.info("="*60)
     
     # Create directories
     checkpoint_dir = Path(config['checkpoint']['save_dir'])
@@ -282,14 +305,20 @@ def main():
     log_dir = Path(config['logging']['log_dir'])
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load datasets
+    # Load datasets with optional limit for testing
+    max_sequences = config.get('max_sequences_per_dataset', None)
+    if max_sequences:
+        logger.info(f"WARNING: Limiting to {max_sequences} sequences per dataset for testing")
+    
     train_dataset = MigraineDataset(
         config['data']['train'],
-        sequence_length=config['training']['sequence_length']
+        sequence_length=config['training']['sequence_length'],
+        max_sequences=max_sequences
     )
     val_dataset = MigraineDataset(
         config['data']['val'],
-        sequence_length=config['training']['sequence_length']
+        sequence_length=config['training']['sequence_length'],
+        max_sequences=max_sequences
     )
     
     train_loader = DataLoader(
@@ -306,6 +335,7 @@ def main():
     )
     
     # Create model
+    logger.info("Creating model...")
     model = SimpleALINE(
         in_dim=config['model']['in_dim'],
         z_dim=config['model']['z_dim'],
@@ -316,9 +346,8 @@ def main():
     
     logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
-    # Log GPU allocation
+    # Log GPU allocation after moving model to device
     if device.type == 'cuda':
-        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
         logger.info(f"GPU memory allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
         logger.info(f"GPU memory reserved: {torch.cuda.memory_reserved(0) / 1024**2:.2f} MB")
     
