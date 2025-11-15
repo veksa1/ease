@@ -8,7 +8,7 @@ interface EnvironmentConfig {
 
 // Default configuration for development
 const defaultConfig: EnvironmentConfig = {
-  REACT_APP_API_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  REACT_APP_API_URL: import.meta.env.VITE_API_URL || 'https://aline-service-hhteadf5zq-uc.a.run.app',
   REACT_APP_ENVIRONMENT: import.meta.env.VITE_ENVIRONMENT || 'development',
 };
 
