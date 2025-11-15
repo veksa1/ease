@@ -244,6 +244,27 @@ class WeatherService:
             "aqi": 50
         }
     
+    async def get_weather_forecast(
+        self, 
+        lat: float, 
+        lon: float, 
+        hours: int = 24
+    ) -> List[Dict]:
+        """
+        Alias for get_forecast for API compatibility.
+        
+        Get hourly forecast for next N hours.
+        
+        Args:
+            lat: Latitude
+            lon: Longitude
+            hours: Number of hours to forecast (max 48)
+        
+        Returns:
+            List of dicts with pressure, temp, humidity for each hour
+        """
+        return await self.get_forecast(lat, lon, hours)
+    
     async def close(self):
         """Close HTTP client."""
         await self.client.aclose()
