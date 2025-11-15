@@ -411,4 +411,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        # Ensure any unhandled exceptions are both logged and printed to stderr
+        logger.exception("Unhandled exception in training")
+        import traceback, sys
+        traceback.print_exc()
+        sys.exit(1)
