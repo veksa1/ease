@@ -32,6 +32,72 @@ import {
 } from '../utils/voiceReportMapper';
 import { getRealtimeSessionEndpoint } from '../utils/env';
 
+const MIGRAINE_TOOL_NAME = 'save_migraine_report';
+const MIGRAINE_TOOL_SCHEMA = {
+  type: 'function',
+  name: MIGRAINE_TOOL_NAME,
+  description:
+    'Call this when you have gathered enough information to populate the migraine report form. ' +
+    'Provide all details you know; leave a field null or "unknown" if the patient is uncertain.',
+  parameters: {
+    type: 'object',
+    properties: {
+      onsetDate: {
+        type: 'string',
+        description: 'ISO 8601 timestamp describing when the migraine began.',
+      },
+      durationHours: {
+        type: 'number',
+        description: 'Approximate duration of the migraine in hours.',
+      },
+      severity: {
+        type: 'number',
+        description: 'Pain severity on a 0-10 scale.',
+      },
+      auraPresent: {
+        type: 'boolean',
+        description: 'Whether the patient experienced an aura.',
+      },
+      auraTypes: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: ['visual', 'sensory', 'speech', 'motor'],
+        },
+      },
+      painCharacter: {
+        type: 'string',
+        enum: ['throbbing', 'stabbing', 'pressure', 'other'],
+      },
+      symptoms: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'List of accompanying symptoms.',
+      },
+      triggers: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Possible triggers the patient mentioned.',
+      },
+      otherTriggerNotes: { type: 'string' },
+      notes: { type: 'string' },
+      medicationTaken: { type: 'string' },
+      medicationTiming: {
+        type: 'string',
+        enum: ['0-1h', '1-3h', '3-6h', '>6h'],
+      },
+      reliefLevel: {
+        type: 'string',
+        enum: ['none', 'partial', 'good'],
+      },
+      impactMissedWork: { type: 'boolean' },
+      impactHadToRest: { type: 'boolean' },
+      impactScore: { type: 'number' },
+    },
+    required: ['onsetDate', 'severity', 'symptoms', 'triggers'],
+  },
+} as const;
+
 type AssistantStatus =
   | 'idle'
   | 'connecting'
@@ -66,14 +132,18 @@ const buildSystemPrompt = () => `
 You are Dr. Ease, a professional but warm migraine intake specialist helping someone log a migraine.
 
 Communication principles:
+- Start the conversation by greeting the patient and immediately asking them to describe the current migraine onset, timing, and first symptoms in their own words.
+- Whenever the patient responds, acknowledge that you heard them with a brief empathetic cue such as "I understand", "Okay, thank you", or "That makes sense" before moving to the next question.
 - Listen closely and only ask about details that have not been provided yet.
 - Do NOT repeat or reconfirm data that the patient already stated unless they contradict themselves.
 - If information is unclear, ask one short clarifying question; if they still do not know, mark the value as "unknown" (or false) and move on so the intake stays efficient.
 - Keep the tone calm, clinical, and supportive. Speak in concise sentences (under ~18 words).
+- After hearing an answer, do not respond with a confirmation repeating what they said. Instead, move on to the next missing item.
+- When the report is complete, simply say one short line such as "Thank you, I'm saving this now." Do not read details, summaries, or JSON aloud.
 
 Metadata protocol (never spoken aloud):
 - After you verbally acknowledge a new fact, append [[FIELD|fieldName|value]] to the text transcript so the interface stays in sync. These tokens must not be part of the spoken audio.
-- When you are ready to save, give a brief natural-language summary (max 4 sentences). Immediately after that summary, append [[REPORT|{...json...}]] with STRICT JSON (double quotes). Do not read or describe the JSON.
+- Once every required field is captured, simply thank the patient and let them know you are saving the report now. Immediately after that spoken thank you, append [[REPORT|{...json...}]] with STRICT JSON (double quotes). Do not read or describe the JSON.
 - Emit the REPORT token only once per session.
 
 If certain fields remain unknown after reasonable attempts, set them to "unknown", false, or an empty list and continue. Never loop endlessly trying to fill a field.
@@ -103,8 +173,10 @@ export function VoiceMigraineAssistant({
     triggers: [],
   });
   const [structuredReport, setStructuredReport] = useState<MigraineReportFormData | null>(null);
-  const [isFinalizing, setIsFinalizing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSummaryQueued, setAutoSummaryQueued] = useState(false);
+  const [lastUserSpeechAt, setLastUserSpeechAt] = useState<number | null>(null);
+  const [lastSavedReport, setLastSavedReport] = useState<MigraineReportFormData | null>(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -112,17 +184,186 @@ export function VoiceMigraineAssistant({
   const localStreamRef = useRef<MediaStream | null>(null);
   const assistantBuffers = useRef<Record<string, string>>({});
   const metadataBuffer = useRef('');
+  const processedFunctionCallIds = useRef<Set<string>>(new Set());
+
+  const teardownSession = useCallback(() => {
+    dataChannelRef.current?.close();
+    dataChannelRef.current = null;
+
+    peerConnectionRef.current?.close();
+    peerConnectionRef.current = null;
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+  }, []);
+
+  const stopListening = useCallback(() => {
+    teardownSession();
+    setStatus('idle');
+  }, [teardownSession]);
 
   const missingFields = useMemo(
-    () => getMissingFields(collectedData),
-    [collectedData]
+    () => (structuredReport ? [] : getMissingFields(collectedData)),
+    [structuredReport, collectedData]
   );
 
-  const readyForSummary = missingFields.length === 0 && !structuredReport;
+  const readyForSummary = missingFields.length === 0;
+  const hasUserInput = transcript.some(message => message.role === 'user');
 
   const appendTranscript = useCallback((message: TranscriptMessage) => {
     setTranscript(prev => [...prev, message]);
   }, []);
+
+  const finalizeFromCollected = useCallback((): MigraineReportFormData => {
+    const normalized = finalizeFormDataFromPartial(collectedData);
+    setCollectedData(normalized);
+    setStructuredReport(normalized);
+    setStatus('summary');
+    setLastUserSpeechAt(null);
+    return normalized;
+  }, [collectedData]);
+
+  const saveReport = useCallback(
+    async (override?: MigraineReportFormData) => {
+      setIsSaving(true);
+      setError(null);
+      setStatus('saving');
+
+      try {
+        const service = getMigraineService();
+        const payload =
+          override ?? structuredReport ?? finalizeFormDataFromPartial(collectedData);
+        console.log('[VoiceMigraineAssistant] Saving report', payload);
+        await service.createReport(payload);
+        setStatus('saved');
+        setLastSavedReport(payload);
+        teardownSession();
+        onSaved?.();
+      } catch (err) {
+        console.error('[VoiceAssistant] Failed to save report', err);
+        setError('Unable to save the migraine report. Please try again.');
+        setStatus('summary');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [structuredReport, collectedData, onSaved, stopListening, onClose]
+  );
+
+  const handleFunctionCall = useCallback(
+    async (functionPart: {
+      name?: string;
+      arguments?: string;
+      call_id?: string;
+      function?: { name?: string; arguments?: string; call_id?: string };
+      id?: string;
+    }) => {
+      const partName = functionPart?.name ?? functionPart?.function?.name;
+      if (partName !== MIGRAINE_TOOL_NAME) {
+        console.debug('[VoiceAssistant] Unknown function call received', functionPart);
+        return;
+      }
+
+      const callId =
+        functionPart?.call_id ?? functionPart?.function?.call_id ?? functionPart?.id ?? '';
+      if (callId && processedFunctionCallIds.current.has(callId)) {
+        console.debug('[VoiceAssistant] Ignoring duplicate function call', callId);
+        return;
+      }
+      if (callId) {
+        processedFunctionCallIds.current.add(callId);
+      }
+
+      try {
+        const argsPayload = functionPart?.arguments ?? functionPart?.function?.arguments;
+        const args = argsPayload ? JSON.parse(argsPayload) : {};
+        const normalized = mapVoicePayloadToFormData(args, collectedData);
+
+        setCollectedData(normalized);
+        setStructuredReport(normalized);
+        setStatus('summary');
+
+        await saveReport(normalized);
+
+        if (callId) {
+          dataChannelRef.current?.send(
+            JSON.stringify({
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: 'user',
+                metadata: { tool_call_id: callId },
+                content: [
+                  {
+                    type: 'input_text',
+                    text: 'Migraine report saved successfully.',
+                  },
+                ],
+              },
+            })
+          );
+          dataChannelRef.current?.send(JSON.stringify({ type: 'response.create' }));
+        }
+      } catch (error) {
+        console.error('[VoiceAssistant] Failed to handle function call', error, functionPart);
+      }
+    },
+    [collectedData, saveReport]
+  );
+
+  useEffect(() => {
+    if (
+      !readyForSummary ||
+      autoSummaryQueued ||
+      status === 'saving' ||
+      status === 'saved' ||
+      !hasUserInput
+    ) {
+      return;
+    }
+
+    setAutoSummaryQueued(true);
+    if (structuredReport) {
+      saveReport(structuredReport);
+    } else {
+      const normalized = finalizeFromCollected();
+      saveReport(normalized);
+    }
+  }, [
+    readyForSummary,
+    structuredReport,
+    autoSummaryQueued,
+    hasUserInput,
+    status,
+    saveReport,
+    finalizeFromCollected,
+  ]);
+
+  useEffect(() => {
+    if (
+      structuredReport ||
+      !hasUserInput ||
+      !lastUserSpeechAt ||
+      status === 'saving' ||
+      status === 'saved'
+    ) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!structuredReport && hasUserInput) {
+        const normalized = finalizeFormDataFromPartial(collectedData);
+        setCollectedData(normalized);
+        setStructuredReport(normalized);
+        setLastUserSpeechAt(null);
+        saveReport(normalized);
+      }
+    }, 12000);
+
+    return () => clearTimeout(timeout);
+  }, [hasUserInput, structuredReport, lastUserSpeechAt, collectedData, saveReport, status]);
 
   const processAssistantText = useCallback(
     (responseId: string) => {
@@ -133,6 +374,7 @@ export function VoiceMigraineAssistant({
       const { text, fieldUpdates, report } = extractVoiceAssistantMetadata(raw);
 
       if (text) {
+        console.debug('[VoiceAssistant] assistant text chunk', raw);
         appendTranscript({
           id: responseId,
           role: 'assistant',
@@ -144,6 +386,7 @@ export function VoiceMigraineAssistant({
       let nextData = collectedData;
 
       if (fieldUpdates.length) {
+        console.debug('[VoiceAssistant] field updates', fieldUpdates);
         nextData = fieldUpdates.reduce(
           (acc, update) => applyVoiceFieldUpdate(acc, update.field, update.value),
           nextData
@@ -152,18 +395,40 @@ export function VoiceMigraineAssistant({
       }
 
       if (report) {
+        console.debug('[VoiceAssistant] report payload', report);
         const normalized = mapVoicePayloadToFormData(report, nextData);
         setCollectedData(normalized);
         setStructuredReport(normalized);
         setStatus('summary');
+        saveReport(normalized);
       }
     },
-    [appendTranscript, collectedData]
+    [appendTranscript, collectedData, saveReport]
   );
 
   const handleDataChannelMessage = useStableCallback((event: MessageEvent<string>) => {
+    // Surface every inbound data-channel payload so we can inspect the raw responses
+    console.debug('[VoiceAssistant] raw event payload', event.data);
     try {
       const payload = JSON.parse(event.data);
+      const processFunctionOutput = (output?: any[]) => {
+        if (!output) return;
+        output.forEach((item: any) => {
+          if (!item) return;
+          if (item.type === 'function_call') {
+            handleFunctionCall(item);
+            return;
+          }
+          if (Array.isArray(item.content)) {
+            item.content.forEach((part: any) => {
+              if (part?.type === 'function_call') {
+                handleFunctionCall(part);
+              }
+            });
+          }
+        });
+      };
+
       switch (payload.type) {
         case 'response.output_text.delta': {
           const { response_id: responseId, delta } = payload;
@@ -176,6 +441,20 @@ export function VoiceMigraineAssistant({
           processAssistantText(payload.response_id);
           break;
         }
+        case 'response.output_item.added':
+        case 'response.output_item.done': {
+          if (payload?.item) {
+            processFunctionOutput([payload.item]);
+          }
+          break;
+        }
+        case 'response.content_part.added': {
+          const part = payload.part;
+          if (part?.type === 'function_call') {
+            handleFunctionCall(part);
+          }
+          break;
+        }
         case 'conversation.item.input_audio_transcription.completed': {
           if (payload.transcript) {
             appendTranscript({
@@ -184,11 +463,15 @@ export function VoiceMigraineAssistant({
               text: payload.transcript,
               timestamp: Date.now(),
             });
+            setLastUserSpeechAt(Date.now());
+
+            dataChannelRef.current?.send(JSON.stringify({ type: 'response.create' }));
           }
           break;
         }
         case 'response.completed': {
           processAssistantText(payload.response?.id ?? payload.response_id);
+          processFunctionOutput(payload.response?.output);
           break;
         }
         case 'response.error':
@@ -201,6 +484,7 @@ export function VoiceMigraineAssistant({
           break;
       }
     } catch (err) {
+      console.warn('[VoiceAssistant] Failed to parse event payload as JSON', err, event.data);
       metadataBuffer.current += ` ${event.data}`;
       const metadataMatch = /\[\[REPORT\|(.*?)\]\]/.exec(metadataBuffer.current);
       if (metadataMatch) {
@@ -237,19 +521,6 @@ export function VoiceMigraineAssistant({
     return data;
   };
 
-  const teardownSession = useCallback(() => {
-    dataChannelRef.current?.close();
-    dataChannelRef.current = null;
-
-    peerConnectionRef.current?.close();
-    peerConnectionRef.current = null;
-
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     return () => {
       teardownSession();
@@ -267,6 +538,10 @@ export function VoiceMigraineAssistant({
       symptoms: [],
       triggers: [],
     });
+    setAutoSummaryQueued(false);
+    setLastSavedReport(null);
+    setLastUserSpeechAt(null);
+    processedFunctionCallIds.current.clear();
     assistantBuffers.current = {};
     metadataBuffer.current = '';
 
@@ -318,6 +593,8 @@ export function VoiceMigraineAssistant({
               instructions: buildSystemPrompt(),
               voice: session.voice ?? 'alloy',
               modalities: ['audio', 'text'],
+              tools: [MIGRAINE_TOOL_SCHEMA],
+              tool_choice: 'auto',
             },
           })
         );
@@ -354,77 +631,28 @@ export function VoiceMigraineAssistant({
     }
   };
 
-  const stopListening = () => {
-    teardownSession();
-    setStatus('idle');
-  };
-
-  const requestFinalSummary = () => {
-    if (!dataChannelRef.current) {
-      return;
-    }
-    setIsFinalizing(true);
-    dataChannelRef.current.send(
-      JSON.stringify({
-        type: 'conversation.item.create',
-        item: {
-          type: 'message',
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: 'Please confirm the details collected and emit the final REPORT token so we can save the migraine record.',
-            },
-          ],
-        },
-      })
-    );
-    dataChannelRef.current.send(JSON.stringify({ type: 'response.create' }));
-    setTimeout(() => setIsFinalizing(false), 1500);
-  };
-
-  const saveReport = async () => {
-    if (!structuredReport) return;
-    setIsSaving(true);
-    setError(null);
-    setStatus('saving');
-
-    try {
-      const service = getMigraineService();
-      await service.createReport(structuredReport);
-      setStatus('saved');
-      onSaved?.();
-      setTimeout(() => {
-        stopListening();
-        onClose();
-      }, 1200);
-    } catch (err) {
-      console.error('[VoiceAssistant] Failed to save report', err);
-      setError('Unable to save the migraine report. Please try again.');
-      setStatus('summary');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const formatFieldValue = useCallback(
     (field: VoiceFieldConfig, data: Partial<MigraineReportFormData>) => {
+      const finalized = Boolean(structuredReport);
       const value = data[field.id];
       if (field.id === 'onsetDate' && value instanceof Date) {
         return value.toLocaleString();
       }
       if (Array.isArray(value)) {
-        return value.length ? value.join(', ') : 'Pending';
+        if (value.length === 0) {
+          return finalized ? 'Not specified' : 'Pending';
+        }
+        return value.join(', ');
       }
       if (typeof value === 'boolean') {
         return value ? 'Yes' : 'No';
       }
       if (value === undefined || value === '') {
-        return 'Pending';
+        return finalized ? 'Unknown' : 'Pending';
       }
       return `${value}`;
     },
-    []
+    [structuredReport]
   );
 
   const statusLabel = (() => {
@@ -432,7 +660,7 @@ export function VoiceMigraineAssistant({
       case 'idle':
         return 'Ready to begin';
       case 'connecting':
-        return 'Connecting to clinician';
+        return 'Connecting to Dr. Ease';
       case 'listening':
         return 'Listening';
       case 'summary':
@@ -637,35 +865,42 @@ export function VoiceMigraineAssistant({
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     {readyForSummary
-                      ? 'All data captured. Ask the assistant to confirm and finalize.'
+                      ? 'All required information is captured. Dr. Ease will thank you and save automatically.'
                       : 'The assistant will keep asking brief questions until every item is captured.'}
                   </p>
-                  {readyForSummary && (
-                    <Button
-                      variant="outline"
-                      onClick={requestFinalSummary}
-                      disabled={isFinalizing}
-                      className="gap-2"
-                    >
-                      {isFinalizing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Waiting for summary
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="h-4 w-4" />
-                          Ask for confirmation
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (!hasUserInput) return;
+                      const normalized = finalizeFromCollected();
+                      saveReport(normalized);
+                    }}
+                    disabled={!hasUserInput}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Finish & save now
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {hasUserInput
+                      ? 'This saves whatever information has been captured so far, even if some items are still pending.'
+                      : 'Start speaking first so we can capture at least a few details before saving.'}
+                  </p>
                 </div>
               )}
             </div>
           </aside>
         </div>
       </div>
+
+      {lastSavedReport && (
+        <div className="border-t border-border bg-background/90 p-4 text-xs text-muted-foreground overflow-y-auto max-h-48">
+          <p className="font-semibold mb-2 text-foreground">Saved report payload</p>
+          <pre className="whitespace-pre-wrap break-words text-[11px]">
+            {JSON.stringify(lastSavedReport, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

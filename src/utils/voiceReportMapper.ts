@@ -413,8 +413,8 @@ export interface AssistantMetadataResult {
   report?: VoiceIntakePayload;
 }
 
-const FIELD_TOKEN = /\[\[FIELD\|([a-zA-Z_]+)\|(.*?)\]\]/g;
-const REPORT_TOKEN = /\[\[REPORT\|(.*?)\]\]/g;
+const FIELD_TOKEN = /\[\[FIELD\|([a-zA-Z_]+)\|([\s\S]*?)\]\]/g;
+const REPORT_TOKEN = /\[\[REPORT\|([\s\S]*?)\]\]/g;
 
 const isVoiceFieldId = (value: string): value is VoiceFieldId => {
   return (

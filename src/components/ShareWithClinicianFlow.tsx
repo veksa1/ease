@@ -90,7 +90,7 @@ export function ShareWithClinicianFlow({ onClose }: ShareWithClinicianFlowProps)
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-3xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-h2">Share with clinician</h2>
+              <h2 className="text-h2">Share with Dr. Ease</h2>
               <button
                 onClick={onClose}
                 className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -250,7 +250,7 @@ export function ShareWithClinicianFlow({ onClose }: ShareWithClinicianFlowProps)
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-3xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-h2">Share with clinician</h2>
+            <h2 className="text-h2">Share with Dr. Ease</h2>
             <button
               onClick={onClose}
               className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
