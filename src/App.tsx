@@ -119,20 +119,8 @@ export default function App() {
       {currentScreen === 'onboarding-1' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={1} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={1} totalSteps={3} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6">
@@ -214,20 +202,8 @@ export default function App() {
       {currentScreen === 'onboarding-2' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={2} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={2} totalSteps={3} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
@@ -318,20 +294,8 @@ export default function App() {
       {currentScreen === 'onboarding-3' && (
         <>
           <header className="px-6 pt-6 pb-4">
-            <div className="max-w-md mx-auto flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <OnboardingProgress currentStep={3} totalSteps={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <AccessibleSwitch
-                  id="low-stim"
-                  checked={lowStimulationMode}
-                  onCheckedChange={setLowStimulationMode}
-                />
-                <Label htmlFor="low-stim" className="text-label cursor-pointer">
-                  Low-stim
-                </Label>
-              </div>
+            <div className="max-w-md mx-auto">
+              <OnboardingProgress currentStep={3} totalSteps={3} />
             </div>
           </header>
           <main className="flex-1 px-6 pb-6 overflow-y-auto">
