@@ -59,7 +59,7 @@ export function SootheMode({ onClose }: SootheModeProps) {
       </div>
 
       {/* Content */}
-      <div className="relative flex flex-col items-center justify-center flex-1 px-6 pb-32">
+      <div className="relative flex flex-col items-center justify-center flex-1 px-6 pb-8">
 
         {/* Timer display */}
         <div className="mb-12 space-y-8 text-center">
@@ -81,8 +81,36 @@ export function SootheMode({ onClose }: SootheModeProps) {
           <div className="w-24 h-24 rounded-full bg-primary/40" />
         </div>
 
+        {/* Settings - Moved above action buttons */}
+        <div className="w-full max-w-sm mb-8">
+          <div className="flex items-center justify-center gap-8">
+            <button
+              onClick={() => setIsDimmed(!isDimmed)}
+              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
+              style={{ minWidth: '44px', minHeight: '44px' }}
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                <span className="text-lg">{isDimmed ? '◐' : '○'}</span>
+              </div>
+              <span className="text-xs">
+                {isDimmed ? 'Dimmed' : 'Dim screen'}
+              </span>
+            </button>
+            <button
+              onClick={() => setIsSoundOn(!isSoundOn)}
+              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
+              style={{ minWidth: '44px', minHeight: '44px' }}
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                {isSoundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </div>
+              <span className="text-xs">{isSoundOn ? 'Sound on' : 'Sound off'}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Actions */}
-        <div className="w-full max-w-sm mb-6 space-y-3">
+        <div className="w-full max-w-sm space-y-3">
           {timeRemaining === 0 ? (
             <Button
               onClick={onClose}
@@ -110,36 +138,6 @@ export function SootheMode({ onClose }: SootheModeProps) {
               </Button>
             </>
           )}
-        </div>
-      </div>
-
-      {/* Settings - Fixed at bottom with proper spacing */}
-      <div className="relative z-10 pb-safe">
-        <div className="px-6 pb-6">
-          <div className="flex items-center justify-center max-w-sm gap-6 mx-auto">
-            <button
-              onClick={() => setIsDimmed(!isDimmed)}
-              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted">
-                {isDimmed ? '◐' : '○'}
-              </div>
-              <span className="text-label">
-                {isDimmed ? 'Dimmed' : 'Dim screen'}
-              </span>
-            </button>
-            <button
-              onClick={() => setIsSoundOn(!isSoundOn)}
-              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted">
-                {isSoundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </div>
-              <span className="text-label">{isSoundOn ? 'Sound on' : 'Sound off'}</span>
-            </button>
-          </div>
         </div>
       </div>
 
