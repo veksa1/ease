@@ -1,0 +1,110 @@
+# Prior distributions for migraine risk factors
+# Based on literature and population statistics
+# Used for ALINE simulator and feature normalization
+
+# Sleep Category
+Sleep Duration (hours):
+  dist: normal
+  mu: 7.0
+  sigma: 1.2
+
+Sleep Quality (1-10):
+  dist: normal
+  mu: 6.5
+  sigma: 1.8
+
+Sleep Consistency Score:
+  dist: normal
+  mu: 6.0
+  sigma: 1.5
+
+# Stress Category
+Stress Level (1-10):
+  dist: normal
+  mu: 6.0
+  sigma: 2.0
+
+Work Hours:
+  dist: normal
+  mu: 8.5
+  sigma: 2.0
+
+Anxiety Score (1-10):
+  dist: normal
+  mu: 5.5
+  sigma: 2.2
+
+# Diet Category
+Caffeine Intake (mg):
+  dist: lognormal
+  mu_ln: 5.3  # exp(5.3) ≈ 200
+  sigma_ln: 0.6
+
+Water Intake (L):
+  dist: normal
+  mu: 2.0
+  sigma: 0.8
+
+Meal Regularity (1-10):
+  dist: normal
+  mu: 6.5
+  sigma: 2.0
+
+# Physical Category
+Exercise Duration (min):
+  dist: lognormal
+  mu_ln: 3.4  # exp(3.4) ≈ 30
+  sigma_ln: 0.8
+
+Physical Activity Level (1-10):
+  dist: normal
+  mu: 5.5
+  sigma: 2.0
+
+Neck Tension (1-10):
+  dist: normal
+  mu: 4.5
+  sigma: 2.5
+
+# Environmental Category
+Screen Time (hours):
+  dist: normal
+  mu: 8.0
+  sigma: 3.0
+
+Weather Pressure (hPa):
+  dist: normal
+  mu: 1013
+  sigma: 15
+
+Noise Level (dB):
+  dist: normal
+  mu: 55
+  sigma: 12
+
+# Hormonal Category
+Hormone Fluctuation Index:
+  dist: normal
+  mu: 5.0
+  sigma: 2.5
+
+Menstrual Cycle Day:
+  dist: uniform
+  min: 1
+  max: 28
+
+# Lifestyle Category
+Alcohol Consumption (units):
+  dist: lognormal
+  mu_ln: 0.5  # exp(0.5) ≈ 1.6
+  sigma_ln: 0.9
+
+Smoking (cigarettes/day):
+  dist: lognormal
+  mu_ln: 1.2  # exp(1.2) ≈ 3.3
+  sigma_ln: 1.5
+
+Meditation Time (min):
+  dist: lognormal
+  mu_ln: 2.5  # exp(2.5) ≈ 12
+  sigma_ln: 1.0
