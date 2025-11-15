@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { BottomNav } from './BottomNav';
+import { useCorrelations } from '../hooks/useDemoData';
 
 interface InsightsScreenProps {
   onBack?: () => void;
@@ -35,39 +36,22 @@ type CorrelationData = {
 export function InsightsScreen({ onBack, onNavigate }: InsightsScreenProps) {
   const [activeBottomSheet, setActiveBottomSheet] = useState<BottomSheetType>(null);
   const [selectedCorrelation, setSelectedCorrelation] = useState<CorrelationData | null>(null);
-  const [experimentDays, setExperimentDays] = useState<boolean[]>([
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-  ]);
-
-  const correlations: CorrelationData[] = [
-    {
-      id: '1',
-      label: '<6h sleep',
-      strength: 78,
-      explanation:
-        'Short sleep days correlated with higher risk. Getting less than 6 hours of sleep was associated with elevated migraine risk.',
-    },
-    {
-      id: '2',
-      label: 'Monday mornings',
-      strength: 65,
-      explanation:
-        'Monday mornings showed higher risk correlation. Weekend schedule changes may contribute to increased vulnerability.',
-    },
-    {
-      id: '3',
-      label: 'Low HRV',
-      strength: 72,
-      explanation:
-        'Lower heart rate variability correlated with higher risk. HRV below your baseline often preceded migraine episodes.',
-    },
-  ];
+  
+  // Load correlations from demo data
+  const { loading, correlations } = useCorrelations();
+  
+  // Experiment tracking (persisted to localStorage)
+  const [experimentDays, setExperimentDays] = useState<boolean[]>(() => {
+    const stored = localStorage.getItem('ease_experiment_hydration');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return [false, false, false, false, false, false, false];
+      }
+    }
+    return [false, false, false, false, false, false, false];
+  });
 
   const handleViewDetails = (correlation: CorrelationData) => {
     setSelectedCorrelation(correlation);
@@ -78,9 +62,30 @@ export function InsightsScreen({ onBack, onNavigate }: InsightsScreenProps) {
     const newDays = [...experimentDays];
     newDays[index] = !newDays[index];
     setExperimentDays(newDays);
+    // Save to localStorage
+    localStorage.setItem('ease_experiment_hydration', JSON.stringify(newDays));
   };
 
+  const completedDays = experimentDays.filter(Boolean).length;
+  
   const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  // Generate pattern text from top correlations
+  const patternText = correlations.length > 0 
+    ? correlations.slice(0, 2).map(c => c.label).join(' + ')
+    : 'Building patterns...';
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-label text-muted-foreground">Loading insights...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -114,7 +119,7 @@ export function InsightsScreen({ onBack, onNavigate }: InsightsScreenProps) {
               style={{ borderRadius: '20px' }}
             >
               <TrendingUp className="w-4 h-4" />
-              <span className="text-label">Your pattern this month: Mondays + low HRV</span>
+              <span className="text-label">Your pattern this month: {patternText}</span>
             </div>
           </div>
         </div>
