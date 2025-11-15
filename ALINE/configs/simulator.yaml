@@ -49,7 +49,9 @@ paths:
   output_meta: data/synthetic_migraine_meta.json
 
 # Feature order (must match CSV column order)
+# 35 total features: 20 base + 4 temporal (Ticket 020) + 11 new (Ticket 025)
 feature_order:
+  # Base 20 features
   - Sleep Duration (hours)
   - Sleep Quality (1-10)
   - Sleep Consistency Score
@@ -70,3 +72,24 @@ feature_order:
   - Alcohol Consumption (units)
   - Smoking (cigarettes/day)
   - Meditation Time (min)
+  # Temporal features (Ticket 020)
+  - day_of_week_sin
+  - day_of_week_cos
+  - week_of_year_sin
+  - week_of_year_cos
+  # New biometric features (Ticket 025)
+  - HRV
+  - Resting Heart Rate
+  - Body Temperature Change
+  # New environmental features (Ticket 025)
+  - Barometric Pressure Change
+  - Air Quality Index
+  - Altitude
+  # New manual tracking features (Ticket 025)
+  - Prodrome Symptoms
+  # Demographic features (Ticket 025)
+  - Age
+  - Body Weight
+  - BMI
+  # Medical history (Ticket 025)
+  - Migraine History Years

@@ -38,7 +38,7 @@ DEMO_USER = {
 # Days with migraine events (0-indexed)
 MIGRAINE_DAYS = [3, 7, 12, 15, 21, 27]
 
-# Feature names (20 features matching model.yaml in_dim)
+# Feature names (35 features: 20 base + 4 temporal + 11 new from Ticket 025)
 FEATURE_NAMES = [
     'sleep_duration', 'sleep_quality', 'sleep_consistency',
     'stress_level', 'work_hours', 'anxiety',
@@ -46,7 +46,14 @@ FEATURE_NAMES = [
     'exercise_duration', 'physical_activity', 'neck_tension',
     'screen_time', 'weather_pressure', 'noise_level',
     'hormone_fluctuation', 'menstrual_cycle_day',
-    'alcohol', 'smoking', 'meditation'
+    'alcohol', 'smoking', 'meditation',
+    'day_of_week_sin', 'day_of_week_cos',
+    'week_of_year_sin', 'week_of_year_cos',
+    'hrv', 'resting_heart_rate', 'body_temperature_change',
+    'barometric_pressure_change', 'air_quality_index', 'altitude',
+    'prodrome_symptoms',
+    'age', 'body_weight', 'bmi',
+    'migraine_history_years'
 ]
 
 
@@ -59,10 +66,27 @@ def generate_daily_features(day_index, is_migraine_day=False):
         is_migraine_day: Whether this day has a migraine
         
     Returns:
-        List of 24 hourly feature vectors (each with 20 features)
+        List of 24 hourly feature vectors (each with 35 features)
     """
     # Set random seed for reproducibility
     np.random.seed(42 + day_index)
+    
+    # Compute temporal features (Ticket 020)
+    # Assume simulation starts on Monday (day_of_week=0)
+    day_of_week = day_index % 7
+    week_of_year = (day_index // 7) % 52
+    
+    day_of_week_sin = np.sin(2 * np.pi * day_of_week / 7)
+    day_of_week_cos = np.cos(2 * np.pi * day_of_week / 7)
+    week_of_year_sin = np.sin(2 * np.pi * week_of_year / 52)
+    week_of_year_cos = np.cos(2 * np.pi * week_of_year / 52)
+    
+    # Demographic features (Ticket 025) - constant per user
+    age = 32  # Alex's age
+    body_weight = 70  # kg
+    height = 1.75  # meters
+    bmi = body_weight / (height ** 2)
+    migraine_history_years = 5  # years since first migraine
     
     # Base daily values (vary by day)
     sleep_duration = np.random.normal(7.2, 1.2)
@@ -76,6 +100,32 @@ def generate_daily_features(day_index, is_migraine_day=False):
     
     daily_stress = np.clip(np.random.normal(6, 2), 1, 10)
     daily_hrv = np.random.normal(55, 8)
+    daily_rhr = np.clip(np.random.normal(70, 12), 45, 100)
+    
+    # On migraine days, reduce HRV and increase RHR (stress indicators)
+    if is_migraine_day:
+        daily_hrv *= 0.7
+        daily_rhr *= 1.2
+    
+    # Body temperature baseline (small variations)
+    daily_temp_change = np.random.normal(0, 0.2)
+    
+    # Environmental features (vary by day)
+    daily_pressure = 1013 + np.random.normal(0, 10)
+    pressure_change = np.abs(np.random.normal(0, 2))  # Barometric pressure change
+    if is_migraine_day:
+        pressure_change += np.random.uniform(3, 8)  # Larger changes trigger migraines
+    
+    aqi = np.clip(np.random.lognormal(3.9, 0.6), 0, 300)  # Air quality index
+    altitude = 100  # meters (Alex lives near sea level)
+    
+    # Prodrome symptoms (appear 24-48h before migraine)
+    # For simplicity, show on the day before migraine
+    prodrome_intensity = 0
+    if day_index > 0 and day_index < 29:  # Check next day
+        next_day_has_migraine = (day_index + 1) in MIGRAINE_DAYS
+        if next_day_has_migraine:
+            prodrome_intensity = np.clip(np.random.normal(6, 2), 3, 10)
     
     # Hormonal cycle (28-day cycle)
     cycle_day = (day_index % 28) + 1
@@ -90,7 +140,7 @@ def generate_daily_features(day_index, is_migraine_day=False):
         # Circadian variation
         circadian_factor = np.sin(2 * np.pi * (hour - 6) / 24)
         
-        # Build feature vector
+        # Build feature vector (35 features total)
         features = [
             # Sleep (reported at wake-up hour 7)
             sleep_duration if hour == 7 else 0,
@@ -116,7 +166,7 @@ def generate_daily_features(day_index, is_migraine_day=False):
             
             # Environmental
             1.5 if not is_sleeping else 0,  # screen_time (hours/hour = 1.5 for high usage)
-            1013 + np.random.normal(0, 5),  # weather_pressure
+            daily_pressure + np.random.normal(0, 2),  # weather_pressure (hourly variation)
             45 if is_sleeping else (65 + np.random.normal(0, 5)),  # noise_level
             
             # Hormonal
@@ -127,6 +177,33 @@ def generate_daily_features(day_index, is_migraine_day=False):
             2 if hour == 19 else 0,  # alcohol (occasional evening drink)
             0,  # smoking (Alex doesn't smoke)
             20 if hour == 7 else 0,  # meditation (morning routine)
+            
+            # Temporal features (Ticket 020) - same for all hours in a day
+            day_of_week_sin,
+            day_of_week_cos,
+            week_of_year_sin,
+            week_of_year_cos,
+            
+            # Biometric features (Ticket 025)
+            daily_hrv,  # HRV (varies throughout day)
+            daily_rhr,  # Resting heart rate
+            daily_temp_change,  # Body temperature change
+            
+            # Environmental features extended (Ticket 025)
+            pressure_change,  # Barometric pressure change
+            aqi,  # Air quality index
+            altitude,  # Altitude
+            
+            # Manual tracking (Ticket 025)
+            prodrome_intensity,  # Prodrome symptoms
+            
+            # Demographics (Ticket 025) - constant
+            age,
+            body_weight,
+            bmi,
+            
+            # Medical history (Ticket 025) - constant
+            migraine_history_years,
         ]
         
         hourly_features.append(features)
