@@ -92,45 +92,75 @@ class MigraineDataset(Dataset):
         # Determine number of worker processes
         if num_workers is None:
             num_workers = max(1, cpu_count() - 1)  # Leave one CPU free
-        logger.info(f"Using {num_workers} workers for parallel sequence creation...")
         
-        # Group by user to create sequences - parallel version
+        # Disable multiprocessing if only 1 worker or small dataset
+        use_parallel = num_workers > 1 and len(user_ids) > 100
+        
+        if use_parallel:
+            logger.info(f"Using {num_workers} workers for parallel sequence creation...")
+        else:
+            logger.info(f"Using single-threaded sequence creation...")
+        
+        # Group by user to create sequences
         user_ids = self.df['user_id'].unique()
         logger.info(f"Processing {len(user_ids)} users...")
         
-        # Prepare arguments for parallel processing
-        user_args = []
-        for user_id in user_ids:
-            user_df = self.df[self.df['user_id'] == user_id]
-            # Convert to dict for pickling (multiprocessing requirement)
-            user_data = user_df.to_dict('list')
-            user_args.append((user_id, user_data, feature_cols, latent_cols, sequence_length))
-        
-        # Process users in parallel
+        # Process users in parallel or sequentially
         self.sequences = []
-        if num_workers > 1:
-            with Pool(processes=num_workers) as pool:
-                # Use imap_unordered for better performance with progress bar
-                results = list(tqdm(
-                    pool.imap_unordered(_process_user_sequences, user_args, chunksize=10),
-                    total=len(user_args),
-                    desc="Creating sequences",
-                    unit="user"
-                ))
+        
+        if use_parallel:
+            # Prepare arguments for parallel processing
+            user_args = []
+            for user_id in user_ids:
+                user_df = self.df[self.df['user_id'] == user_id]
+                # Convert to dict for pickling (multiprocessing requirement)
+                user_data = user_df.to_dict('list')
+                user_args.append((user_id, user_data, feature_cols, latent_cols, sequence_length))
+            
+            try:
+                # Process users in parallel with context manager
+                with Pool(processes=num_workers) as pool:
+                    # Use imap_unordered for better performance with progress bar
+                    results = list(tqdm(
+                        pool.imap_unordered(_process_user_sequences, user_args, chunksize=10),
+                        total=len(user_args),
+                        desc="Creating sequences",
+                        unit="user"
+                    ))
+                    
+                    # Flatten results
+                    for user_sequences in results:
+                        self.sequences.extend(user_sequences)
+                        if max_sequences and len(self.sequences) >= max_sequences:
+                            self.sequences = self.sequences[:max_sequences]
+                            break
+            except Exception as e:
+                logger.warning(f"Parallel processing failed ({e}), falling back to sequential...")
+                use_parallel = False
+                self.sequences = []
+        
+        if not use_parallel:
+            # Sequential fallback
+            for user_id in tqdm(user_ids, desc="Creating sequences", unit="user"):
+                user_df = self.df[self.df['user_id'] == user_id].sort_values('day').reset_index(drop=True)
                 
-                # Flatten results
-                for user_sequences in results:
-                    self.sequences.extend(user_sequences)
+                for i in range(len(user_df) - sequence_length):
+                    features = user_df.loc[i:i+sequence_length-1, feature_cols].values
+                    latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
+                    migraine_next = user_df.loc[i+sequence_length, 'migraine']
+                    migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
+                    
+                    self.sequences.append({
+                        'features': features,
+                        'latents': latents,
+                        'migraine_next': migraine_next,
+                        'migraine_prob_next': migraine_prob_next
+                    })
+                    
                     if max_sequences and len(self.sequences) >= max_sequences:
-                        self.sequences = self.sequences[:max_sequences]
                         break
-        else:
-            # Fallback to single-threaded if num_workers=1
-            for args in tqdm(user_args, desc="Creating sequences", unit="user"):
-                user_sequences = _process_user_sequences(args)
-                self.sequences.extend(user_sequences)
+                
                 if max_sequences and len(self.sequences) >= max_sequences:
-                    self.sequences = self.sequences[:max_sequences]
                     break
         
         logger.info(f"Created {len(self.sequences)} sequences from {len(user_ids)} users")
@@ -338,6 +368,13 @@ def validate(model, dataloader, device, config):
 
 
 def main():
+    # Set multiprocessing start method for compatibility
+    import multiprocessing as mp
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass  # Already set
+    
     # Load config
     config_path = Path(__file__).parent.parent / 'configs' / 'train.yaml'
     with open(config_path) as f:
