@@ -6,7 +6,7 @@
  */
 
 import initSqlJs, { Database } from 'sql.js';
-import { TriggerCombination, InterventionInstruction, InterventionEffectiveness, PersonalMigraineProfile } from '../types';
+import { TriggerCombination, InterventionInstruction, InterventionEffectiveness, PersonalMigraineProfile, TriggerHypothesis } from '../types';
 
 const DB_NAME = 'ease_app_db';
 const DB_VERSION = 2;
@@ -224,6 +224,23 @@ class SQLiteService {
         age REAL NOT NULL,
         weight_kg REAL,
         bmi REAL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
+    // User trigger hypotheses
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS user_trigger_hypotheses (
+        id TEXT PRIMARY KEY,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        freq_per_month REAL,
+        threshold TEXT,
+        onset_window_hours REAL,
+        helps TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
     `);
@@ -655,6 +672,136 @@ class SQLiteService {
       weightKg: row[2] as number | null ?? undefined,
       bmi: row[3] as number | null ?? undefined,
     };
+  }
+
+  // ==================== Trigger Hypotheses ====================
+
+  async saveTriggerHypothesis(h: Omit<TriggerHypothesis, 'createdAt' | 'updatedAt'>): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const now = new Date().toISOString();
+
+    this.db.run(
+      `INSERT INTO user_trigger_hypotheses 
+       (id, key, label, confidence, freq_per_month, threshold, onset_window_hours, helps, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         key = excluded.key,
+         label = excluded.label,
+         confidence = excluded.confidence,
+         freq_per_month = excluded.freq_per_month,
+         threshold = excluded.threshold,
+         onset_window_hours = excluded.onset_window_hours,
+         helps = excluded.helps,
+         notes = excluded.notes,
+         updated_at = excluded.updated_at`,
+      [
+        h.id,
+        h.key,
+        h.label,
+        h.confidence,
+        h.freqPerMonth ?? null,
+        h.threshold ?? null,
+        h.onsetWindowHours ?? null,
+        h.helps ?? null,
+        h.notes ?? null,
+        now,
+        now,
+      ]
+    );
+
+    await this.saveToIndexedDB();
+  }
+
+  async updateTriggerHypothesis(id: string, partial: Partial<Omit<TriggerHypothesis, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (partial.key !== undefined) {
+      updates.push('key = ?');
+      values.push(partial.key);
+    }
+    if (partial.label !== undefined) {
+      updates.push('label = ?');
+      values.push(partial.label);
+    }
+    if (partial.confidence !== undefined) {
+      updates.push('confidence = ?');
+      values.push(partial.confidence);
+    }
+    if (partial.freqPerMonth !== undefined) {
+      updates.push('freq_per_month = ?');
+      values.push(partial.freqPerMonth);
+    }
+    if (partial.threshold !== undefined) {
+      updates.push('threshold = ?');
+      values.push(partial.threshold);
+    }
+    if (partial.onsetWindowHours !== undefined) {
+      updates.push('onset_window_hours = ?');
+      values.push(partial.onsetWindowHours);
+    }
+    if (partial.helps !== undefined) {
+      updates.push('helps = ?');
+      values.push(partial.helps);
+    }
+    if (partial.notes !== undefined) {
+      updates.push('notes = ?');
+      values.push(partial.notes);
+    }
+
+    if (updates.length === 0) return;
+
+    updates.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    this.db.run(
+      `UPDATE user_trigger_hypotheses SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    await this.saveToIndexedDB();
+  }
+
+  async getTriggerHypotheses(): Promise<TriggerHypothesis[]> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const results = this.db.exec(
+      `SELECT id, key, label, confidence, freq_per_month, threshold, onset_window_hours, helps, notes, created_at, updated_at
+       FROM user_trigger_hypotheses
+       ORDER BY created_at ASC`
+    );
+
+    if (!results.length || !results[0].values.length) return [];
+
+    return results[0].values.map(row => ({
+      id: row[0] as string,
+      key: row[1] as string,
+      label: row[2] as string,
+      confidence: row[3] as number,
+      freqPerMonth: row[4] as number | null ?? undefined,
+      threshold: row[5] as string | null ?? undefined,
+      onsetWindowHours: row[6] as number | null ?? undefined,
+      helps: row[7] as string | null ?? undefined,
+      notes: row[8] as string | null ?? undefined,
+      createdAt: row[9] as string,
+      updatedAt: row[10] as string,
+    }));
+  }
+
+  async deleteTriggerHypothesis(id: string): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db.run('DELETE FROM user_trigger_hypotheses WHERE id = ?', [id]);
+
+    await this.saveToIndexedDB();
   }
 
   // ==================== Utility Operations ====================

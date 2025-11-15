@@ -5,7 +5,7 @@
 export interface RiskVariable {
   name: string;
   percentage: number;
-  category: 'biometric' | 'environmental' | 'lifestyle' | 'personal';
+  category: 'biometric' | 'environmental' | 'lifestyle' | 'personal' | 'user-hypothesis';
   value: string;
   unit: string;
 }
@@ -50,4 +50,18 @@ export interface PersonalMigraineProfile {
   age: number;
   weightKg?: number;
   bmi?: number;
+}
+
+export interface TriggerHypothesis {
+  id: string;
+  key: string; // canonical id: 'sleep_loss', 'pressure_drop', etc.
+  label: string; // user-facing label
+  confidence: number; // 0..1 (Not sure→0.25, Possible→0.5, Likely→0.75, Very likely→0.9)
+  freqPerMonth?: number;
+  threshold?: string; // e.g. "<6h sleep", ">8h screen"
+  onsetWindowHours?: number; // typical time to symptom onset
+  helps?: string; // what helps
+  notes?: string; // freeform
+  createdAt: string;
+  updatedAt: string;
 }
