@@ -3,7 +3,7 @@
 
 # Input dimension (number of normalized features per hour)
 # This should match the number of features in the normalized data
-in_dim: 20  # 20 features from priors.yaml
+in_dim: 35  # 20 base + 4 temporal (Ticket 020) + 11 new features (Ticket 025)
 
 # Latent dimension (latent state variables)
 # stress, sleepDebt, hormonal, envLoad

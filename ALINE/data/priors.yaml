@@ -108,3 +108,140 @@ Meditation Time (min):
   dist: lognormal
   mu_ln: 2.5  # exp(2.5) ≈ 12
   sigma_ln: 1.0
+
+# Temporal Cycle Features (Ticket 020)
+day_of_week_sin:
+  dist: cyclical
+  mu: 0.0
+  sigma: 0.707  # std of sin(uniform) ≈ 1/√2
+  min: -1.0
+  max: 1.0
+
+day_of_week_cos:
+  dist: cyclical
+  mu: 0.0
+  sigma: 0.707
+  min: -1.0
+  max: 1.0
+
+week_of_year_sin:
+  dist: cyclical
+  mu: 0.0
+  sigma: 0.707
+  min: -1.0
+  max: 1.0
+
+week_of_year_cos:
+  dist: cyclical
+  mu: 0.0
+  sigma: 0.707
+  min: -1.0
+  max: 1.0
+
+# ============================================================================
+# BIOMETRIC FEATURES (Ticket 025)
+# ============================================================================
+
+HRV:
+  description: "Heart Rate Variability (SDNN)"
+  dist: lognormal
+  mu_ln: 3.9  # exp(3.9) ≈ 50
+  sigma_ln: 0.5
+  min: 10.0
+  max: 120.0
+
+Resting Heart Rate:
+  description: "Resting heart rate"
+  dist: normal
+  mu: 70.0
+  sigma: 12.0
+  min: 45.0
+  max: 100.0
+
+Body Temperature Change:
+  description: "Change from baseline body temperature"
+  dist: normal
+  mu: 0.0
+  sigma: 0.3
+  min: -1.0
+  max: 1.0
+
+# ============================================================================
+# ENVIRONMENTAL FEATURES (Extended) (Ticket 025)
+# ============================================================================
+
+Barometric Pressure Change:
+  description: "Change in barometric pressure over 3 hours"
+  dist: exponential
+  mu_ln: 1.0  # For exponential, this is lambda parameter
+  sigma: 3.0
+  min: 0.0
+  max: 20.0
+
+Air Quality Index:
+  description: "Air quality index (AQI)"
+  dist: lognormal
+  mu_ln: 3.9  # exp(3.9) ≈ 50
+  sigma_ln: 0.6
+  min: 0.0
+  max: 300.0
+
+Altitude:
+  description: "Current altitude/elevation"
+  dist: lognormal
+  mu_ln: 4.6  # exp(4.6) ≈ 100
+  sigma_ln: 0.8
+  min: 0.0
+  max: 4000.0
+
+# ============================================================================
+# MANUAL TRACKING FEATURES (Extended) (Ticket 025)
+# ============================================================================
+
+Prodrome Symptoms:
+  description: "Intensity of prodrome symptoms (yawning, neck stiffness, mood changes)"
+  dist: exponential
+  mu_ln: 0.7  # Low baseline, spikes before migraine
+  sigma: 2.5
+  min: 0.0
+  max: 10.0
+
+# ============================================================================
+# DEMOGRAPHIC FEATURES (Ticket 025)
+# ============================================================================
+
+Age:
+  description: "User age in years"
+  dist: normal
+  mu: 35.0
+  sigma: 12.0
+  min: 18.0
+  max: 80.0
+
+Body Weight:
+  description: "Body weight in kilograms"
+  dist: normal
+  mu: 70.0
+  sigma: 15.0
+  min: 40.0
+  max: 150.0
+
+BMI:
+  description: "Body Mass Index"
+  dist: normal
+  mu: 24.0
+  sigma: 5.0
+  min: 15.0
+  max: 40.0
+
+# ============================================================================
+# MEDICAL HISTORY (Ticket 025)
+# ============================================================================
+
+Migraine History Years:
+  description: "Years since first migraine"
+  dist: exponential
+  mu_ln: 1.6  # exp(1.6) ≈ 5
+  sigma: 8.0
+  min: 0.0
+  max: 40.0
