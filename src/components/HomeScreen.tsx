@@ -14,8 +14,13 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { RiskRing } from './RiskRing';
+import { RiskHeroCard } from './RiskHeroCard';
 import { Button } from './ui/button';
 import { TipCard } from './TipCard';
+import { PillChip } from './PillChip';
+import { ReportMigraineModal } from './ReportMigraineMigral';
+import { InsightsTeaserCard } from './InsightsTeaserCard';
+import { NotificationCard } from './NotificationCard';
 import {
   Carousel,
   CarouselContent,
@@ -29,6 +34,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from './ui/sheet';
+
+interface RiskContributor {
+  label: string;
+  percentage: number;
+  icon: React.ElementType;
+}
 
 interface HomeScreenProps {
   userName: string;
@@ -46,7 +57,13 @@ interface HomeScreenProps {
     screenTime: string;
     upcomingStressor?: string;
   };
-  onQuickCheckClick?: () => void; // optional handler for Quick check action
+  riskContributors?: RiskContributor[];
+  whatHelps?: string[];
+  onQuickCheckClick?: () => void;
+  onInsightsClick?: () => void;
+  onSootheModeClick?: () => void;
+  showNotification?: 'alert' | 'nudge' | null;
+  lowStimulationMode?: boolean;
 }
 
 export function HomeScreen({
@@ -56,8 +73,16 @@ export function HomeScreen({
   contextualAction,
   streakCount,
   todayData,
+  riskContributors = [],
+  whatHelps = [],
   onQuickCheckClick,
+  onInsightsClick,
+  onSootheModeClick,
+  showNotification = null,
+  lowStimulationMode = false,
 }: HomeScreenProps) {
+  const [showDisclaimer, setShowDisclaimer] = React.useState(true);
+  const [notificationDismissed, setNotificationDismissed] = React.useState(false);
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -115,79 +140,53 @@ export function HomeScreen({
             </h1>
           </div>
 
-          {/* Risk Module */}
-          <div
-            className={`p-6 rounded-xl bg-card border ${getModuleBgColor()}`}
-            style={{ borderRadius: '12px', boxShadow: 'var(--shadow-card)' }}
-          >
-            <div className="flex flex-col items-center space-y-4">
-              {/* Risk Ring */}
-              <RiskRing percentage={riskPercentage} size={160} strokeWidth={16} />
+          {/* Notification (if present) */}
+          {showNotification && !notificationDismissed && (
+            <NotificationCard
+              variant={showNotification}
+              message={
+                showNotification === 'alert'
+                  ? 'Your migraine risk is rising for 2–4pm'
+                  : "You've been on-screen for 2h, take 5?"
+              }
+              primaryAction={
+                showNotification === 'alert'
+                  ? {
+                      label: 'Take a 5-min break',
+                      onClick: () => console.log('Taking break'),
+                    }
+                  : {
+                      label: 'Start break',
+                      onClick: () => console.log('Starting break'),
+                    }
+              }
+              secondaryAction={
+                showNotification === 'alert'
+                  ? {
+                      label: 'Remind me in 30m',
+                      onClick: () => console.log('Setting reminder'),
+                    }
+                  : undefined
+              }
+              onDismiss={() => setNotificationDismissed(true)}
+            />
+          )}
 
-              {/* Risk Label */}
-              <div className="flex items-center gap-2">
-                <span className={`text-h2 ${getRiskColor()}`}>
-                  {getRiskLabel()} risk
-                </span>
-                {/* Why Link */}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <button className="text-label text-primary hover:underline flex items-center gap-1">
-                      <HelpCircle className="w-4 h-4" />
-                      Why?
-                    </button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[80vh]">
-                    <SheetHeader>
-                      <SheetTitle>Why {getRiskLabel().toLowerCase()} risk?</SheetTitle>
-                      <SheetDescription>
-                        Understanding your current migraine risk
-                      </SheetDescription>
-                    </SheetHeader>
-                    <div className="mt-6 space-y-4">
-                      <div className="p-4 rounded-xl bg-muted border border-border space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Moon className="w-5 h-5 text-primary" />
-                          <h3 className="text-body">Sleep Quality</h3>
-                        </div>
-                        <p className="text-label text-muted-foreground">
-                          {riskLevel === 'high'
-                            ? 'Your sleep was below your usual quality last night.'
-                            : 'Your sleep quality was good last night.'}
-                        </p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-muted border border-border space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-accent" />
-                          <h3 className="text-body">Heart Rate Variability</h3>
-                        </div>
-                        <p className="text-label text-muted-foreground">
-                          {riskLevel === 'high'
-                            ? 'Your HRV is lower than baseline, indicating increased stress.'
-                            : 'Your HRV is within normal range.'}
-                        </p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-muted border border-border space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-5 h-5 text-warning" />
-                          <h3 className="text-body">Schedule</h3>
-                        </div>
-                        <p className="text-label text-muted-foreground">
-                          {todayData.upcomingStressor ||
-                            'No unusual schedule patterns detected today.'}
-                        </p>
-                      </div>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              </div>
-            </div>
-          </div>
+          {/* Risk Module - Enhanced Gradient Hero Card */}
+          <RiskHeroCard
+            percentage={riskPercentage}
+            riskLevel={riskLevel}
+            confidence={85}
+            riskContributors={riskContributors}
+            whatHelps={whatHelps}
+            lowStimulationMode={lowStimulationMode}
+          />
 
           {/* Primary CTA */}
           <Button
-            className="w-full h-14 rounded-lg gap-2"
-            style={{ borderRadius: '8px' }}
+            onClick={onSootheModeClick}
+            className="w-full h-12 gap-2"
+            style={{ borderRadius: '12px' }}
           >
             <ContextualIcon className="w-5 h-5" />
             {contextualAction.label}
@@ -196,20 +195,24 @@ export function HomeScreen({
           {/* Secondary Actions */}
           <div className="grid grid-cols-2 gap-3">
             {/* Report Migraine */}
-            <Button
-              variant="outline"
-              className="h-12 rounded-lg border-critical text-critical hover:bg-critical/10"
-              style={{ borderRadius: '8px' }}
-            >
-              <AlertCircle className="w-4 h-4" />
-              Report migraine
-            </Button>
+            <ReportMigraineModal
+              trigger={
+                <Button
+                  variant="outline"
+                  className="h-12 border-critical text-critical hover:bg-critical/10"
+                  style={{ borderRadius: '12px' }}
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Report migraine
+                </Button>
+              }
+            />
 
             {/* Quick Check */}
             <Button
               variant="outline"
-              className="h-12 rounded-lg relative"
-              style={{ borderRadius: '8px' }}
+              className="h-12 relative"
+              style={{ borderRadius: '12px' }}
               onClick={onQuickCheckClick}
             >
               <HelpCircle className="w-4 h-4" />
