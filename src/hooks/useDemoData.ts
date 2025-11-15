@@ -8,10 +8,12 @@
 import { useState, useEffect } from 'react';
 import { demoDataService } from '../services/demoDataService';
 import { quickCheckToRiskAdjustment, type QuickCheckData } from '../services/featureConverter';
+import { riskPredictionService } from '../services/riskPredictionService';
 import type { Correlation, CalendarDay, HourlyRisk, UserTimelineEntry } from '../types/aline';
 
 /**
  * Hook for current migraine risk prediction
+ * Fetches real predictions from the ALINE backend API
  * 
  * Usage:
  * ```tsx
@@ -22,18 +24,46 @@ export function useRiskPrediction() {
   const [loading, setLoading] = useState(true);
   const [risk, setRisk] = useState<number>(0);
   const [bounds, setBounds] = useState({ lower: 0, upper: 0 });
+  const [useBackend, setUseBackend] = useState(true);
 
   useEffect(() => {
-    // Simulate loading delay for realistic UX
-    const timer = setTimeout(() => {
+    const fetchRiskPrediction = async () => {
+      setLoading(true);
+      
+      // Check if backend is available
+      const isHealthy = await riskPredictionService.checkHealth();
+      
+      if (isHealthy && useBackend) {
+        // Fetch from backend API
+        const userId = 'demo-user'; // In production, get from auth context
+        
+        // TODO: Replace with actual user feature data
+        // For now, using mock features for demonstration
+        const features = riskPredictionService.generateMockFeatures(10);
+        
+        const prediction = await riskPredictionService.getDailyRisk(userId, features);
+        
+        if (prediction) {
+          setRisk(prediction.mean_probability);
+          setBounds({
+            lower: prediction.lower_bound,
+            upper: prediction.upper_bound,
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to demo data if backend unavailable
+      console.log('Using demo data (backend unavailable or disabled)');
       const { risk: r, lower, upper } = demoDataService.getCurrentRisk();
       setRisk(r);
       setBounds({ lower, upper });
       setLoading(false);
-    }, 300);
+    };
 
-    return () => clearTimeout(timer);
-  }, []);
+    fetchRiskPrediction();
+  }, [useBackend]);
 
   /**
    * Update risk based on QuickCheck responses

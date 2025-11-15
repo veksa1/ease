@@ -42,8 +42,8 @@ export function HomeScreenContainer({
     });
   }, []);
 
-  // Determine risk level from percentage
-  const riskPercentage = 100; // Math.round(risk * 100);
+  // Determine risk level from percentage - now using actual backend prediction
+  const riskPercentage = Math.round(risk * 100);
   const riskLevel: 'low' | 'moderate' | 'high' = 
     riskPercentage < 30 ? 'low' : 
     riskPercentage < 60 ? 'moderate' : 'high';
