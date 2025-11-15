@@ -12,7 +12,7 @@ max_sequences_per_dataset: 100000  # Start with 10k sequences for testing
   
 # Model configuration
 model:
-  in_dim: 20  # Number of features
+  in_dim: 24  # Number of features (20 base + 4 temporal from Ticket 020)
   z_dim: 4  # Latent dimensions
   d_model: 64
   nhead: 4

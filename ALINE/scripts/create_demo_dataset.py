@@ -38,7 +38,7 @@ DEMO_USER = {
 # Days with migraine events (0-indexed)
 MIGRAINE_DAYS = [3, 7, 12, 15, 21, 27]
 
-# Feature names (20 features matching model.yaml in_dim)
+# Feature names (24 features: 20 base + 4 temporal from Ticket 020)
 FEATURE_NAMES = [
     'sleep_duration', 'sleep_quality', 'sleep_consistency',
     'stress_level', 'work_hours', 'anxiety',
@@ -46,7 +46,9 @@ FEATURE_NAMES = [
     'exercise_duration', 'physical_activity', 'neck_tension',
     'screen_time', 'weather_pressure', 'noise_level',
     'hormone_fluctuation', 'menstrual_cycle_day',
-    'alcohol', 'smoking', 'meditation'
+    'alcohol', 'smoking', 'meditation',
+    'day_of_week_sin', 'day_of_week_cos',
+    'week_of_year_sin', 'week_of_year_cos'
 ]
 
 
@@ -59,10 +61,20 @@ def generate_daily_features(day_index, is_migraine_day=False):
         is_migraine_day: Whether this day has a migraine
         
     Returns:
-        List of 24 hourly feature vectors (each with 20 features)
+        List of 24 hourly feature vectors (each with 24 features)
     """
     # Set random seed for reproducibility
     np.random.seed(42 + day_index)
+    
+    # Compute temporal features (Ticket 020)
+    # Assume simulation starts on Monday (day_of_week=0)
+    day_of_week = day_index % 7
+    week_of_year = (day_index // 7) % 52
+    
+    day_of_week_sin = np.sin(2 * np.pi * day_of_week / 7)
+    day_of_week_cos = np.cos(2 * np.pi * day_of_week / 7)
+    week_of_year_sin = np.sin(2 * np.pi * week_of_year / 52)
+    week_of_year_cos = np.cos(2 * np.pi * week_of_year / 52)
     
     # Base daily values (vary by day)
     sleep_duration = np.random.normal(7.2, 1.2)
@@ -90,7 +102,7 @@ def generate_daily_features(day_index, is_migraine_day=False):
         # Circadian variation
         circadian_factor = np.sin(2 * np.pi * (hour - 6) / 24)
         
-        # Build feature vector
+        # Build feature vector (20 base features + 4 temporal features)
         features = [
             # Sleep (reported at wake-up hour 7)
             sleep_duration if hour == 7 else 0,
@@ -127,6 +139,12 @@ def generate_daily_features(day_index, is_migraine_day=False):
             2 if hour == 19 else 0,  # alcohol (occasional evening drink)
             0,  # smoking (Alex doesn't smoke)
             20 if hour == 7 else 0,  # meditation (morning routine)
+            
+            # Temporal features (Ticket 020) - same for all hours in a day
+            day_of_week_sin,
+            day_of_week_cos,
+            week_of_year_sin,
+            week_of_year_cos,
         ]
         
         hourly_features.append(features)

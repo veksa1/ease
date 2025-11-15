@@ -149,6 +149,33 @@ class MigraineSimulator:
         prob = 1.0 / (1.0 + np.exp(-logit))
         return np.clip(prob, 0.0, 1.0)
     
+    def _compute_temporal_features(self, day: int, start_day_of_week: int = 0) -> Dict[str, float]:
+        """
+        Compute temporal cycle features for a given day (Ticket 020).
+        
+        Args:
+            day: Day number in simulation (0-indexed)
+            start_day_of_week: Starting day of week (0=Monday, 6=Sunday)
+        
+        Returns:
+            Dictionary with temporal feature values
+        """
+        # Calculate day of week (0=Monday, 6=Sunday)
+        day_of_week = (start_day_of_week + day) % 7
+        
+        # Calculate week of year (approximate: day / 7 % 52)
+        week_of_year = (day // 7) % 52
+        
+        # Cyclical encoding using sine/cosine
+        temporal_features = {
+            'day_of_week_sin': np.sin(2 * np.pi * day_of_week / 7),
+            'day_of_week_cos': np.cos(2 * np.pi * day_of_week / 7),
+            'week_of_year_sin': np.sin(2 * np.pi * week_of_year / 52),
+            'week_of_year_cos': np.cos(2 * np.pi * week_of_year / 52)
+        }
+        
+        return temporal_features
+    
     def simulate_user(self, user_id: int) -> pd.DataFrame:
         """
         Simulate one user's migraine episodes over the horizon.
@@ -172,6 +199,9 @@ class MigraineSimulator:
             migraine_prob = self._migraine_probability(Z)
             migraine = self.rng.binomial(1, migraine_prob)
             
+            # Compute temporal features (Ticket 020)
+            temporal_features = self._compute_temporal_features(day)
+            
             # Record the day
             record = {
                 'user_id': user_id,
@@ -187,6 +217,9 @@ class MigraineSimulator:
             # Add feature observations
             for i, feature_name in enumerate(self.config.feature_order):
                 record[feature_name] = observations[i]
+            
+            # Add temporal features (Ticket 020)
+            record.update(temporal_features)
             
             records.append(record)
         
