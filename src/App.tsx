@@ -18,9 +18,11 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
+import { RiskVariable } from './types';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
+  const [sootheModeData, setSootheModeData] = useState<{ riskVariables: RiskVariable[], riskPercentage: number } | null>(null);
   
   // Check if user has seen onboarding
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
@@ -533,7 +535,17 @@ export default function App() {
       )}
 
       {currentScreen === 'soothe-mode' && (
-        <SootheMode onClose={() => setCurrentScreen('home')} />
+        sootheModeData ? (
+          <SootheMode 
+            onClose={() => setCurrentScreen('home')}
+            riskVariables={sootheModeData.riskVariables}
+            riskPercentage={sootheModeData.riskPercentage}
+          />
+        ) : (
+          <div className="flex items-center justify-center min-h-screen bg-background">
+            <p className="text-body text-muted-foreground">Loading personalized instructions...</p>
+          </div>
+        )
       )}
 
       {currentScreen === 'home' && (
@@ -541,7 +553,10 @@ export default function App() {
           <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
-            onSootheModeClick={() => setCurrentScreen('soothe-mode')}
+            onSootheModeClick={(riskVariables, riskPercentage) => {
+              setSootheModeData({ riskVariables, riskPercentage });
+              setCurrentScreen('soothe-mode');
+            }}
             lowStimulationMode={lowStimulationMode}
           />
           <BottomNav
@@ -556,7 +571,10 @@ export default function App() {
           <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
-            onSootheModeClick={() => setCurrentScreen('soothe-mode')}
+            onSootheModeClick={(riskVariables, riskPercentage) => {
+              setSootheModeData({ riskVariables, riskPercentage });
+              setCurrentScreen('soothe-mode');
+            }}
             lowStimulationMode={true}
           />
           <BottomNav

@@ -10,11 +10,12 @@ import { Coffee, Moon, Activity, Heart } from 'lucide-react';
 import { HomeScreen } from './HomeScreen';
 import { useRiskPrediction, useTodayMetrics } from '../hooks/useDemoData';
 import { sqliteService } from '../services/sqliteService';
+import { RiskVariable } from '../types';
 
 interface HomeScreenContainerProps {
   onQuickCheckClick?: () => void;
   onInsightsClick?: () => void;
-  onSootheModeClick?: () => void;
+  onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
   lowStimulationMode?: boolean;
 }
 

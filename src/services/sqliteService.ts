@@ -6,6 +6,7 @@
  */
 
 import initSqlJs, { Database } from 'sql.js';
+import { TriggerCombination, InterventionInstruction, InterventionEffectiveness } from '../types';
 
 const DB_NAME = 'ease_app_db';
 const DB_VERSION = 1;
@@ -111,12 +112,41 @@ class SQLiteService {
       )
     `);
 
+    // SootheMode sessions
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS soothemode_sessions (
+        id TEXT PRIMARY KEY,
+        started_at TEXT NOT NULL,
+        trigger_combination_id TEXT NOT NULL,
+        trigger_labels TEXT NOT NULL,
+        completed_instruction_ids TEXT NOT NULL,
+        duration_minutes REAL NOT NULL,
+        outcome TEXT,
+        follow_up_at TEXT,
+        timestamp TEXT NOT NULL
+      )
+    `);
+
+    // Intervention effectiveness tracking
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS intervention_effectiveness (
+        instruction_id TEXT NOT NULL,
+        trigger_combination_id TEXT NOT NULL,
+        success_count INTEGER DEFAULT 0,
+        failure_count INTEGER DEFAULT 0,
+        last_used TEXT NOT NULL,
+        PRIMARY KEY (instruction_id, trigger_combination_id)
+      )
+    `);
+
     // Create indices for faster queries
     this.db.run('CREATE INDEX IF NOT EXISTS idx_timeline_date ON timeline_entries(date)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_experiment_name ON experiments(experiment_name)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_onset ON migraine_reports(onset_at)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_severity ON migraine_reports(severity)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_created ON migraine_reports(created_at)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_soothemode_outcome ON soothemode_sessions(outcome)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_soothemode_followup ON soothemode_sessions(follow_up_at)');
 
     await this.saveToIndexedDB();
   }
@@ -342,6 +372,151 @@ class SQLiteService {
    */
   async clearExperiments(): Promise<void> {
     await this.exec('DELETE FROM experiments');
+  }
+
+  // ==================== SootheMode Session Operations ====================
+
+  /**
+   * Save SootheMode session
+   */
+  async saveSootheModeSession(session: {
+    id: string;
+    startedAt: string;
+    triggerCombination: TriggerCombination;
+    instructions: InterventionInstruction[];
+    completedInstructionIds: string[];
+    durationMinutes: number;
+    outcome?: string;
+  }): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db.run(
+      `INSERT INTO soothemode_sessions 
+       (id, started_at, trigger_combination_id, trigger_labels, completed_instruction_ids, duration_minutes, outcome, follow_up_at, timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        session.id,
+        session.startedAt,
+        session.triggerCombination.id,
+        session.triggerCombination.label,
+        JSON.stringify(session.completedInstructionIds),
+        session.durationMinutes,
+        session.outcome || null,
+        session.outcome ? null : new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), // 3 hours later
+        new Date().toISOString(),
+      ]
+    );
+
+    await this.saveToIndexedDB();
+  }
+
+  /**
+   * Update session outcome after follow-up
+   */
+  async updateSessionOutcome(sessionId: string, outcome: 'prevented' | 'reduced' | 'no-effect'): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db.run(
+      `UPDATE soothemode_sessions SET outcome = ?, follow_up_at = NULL WHERE id = ?`,
+      [outcome, sessionId]
+    );
+
+    // Update effectiveness stats
+    const results = this.db.exec(
+      `SELECT trigger_combination_id, completed_instruction_ids FROM soothemode_sessions WHERE id = ?`,
+      [sessionId]
+    );
+
+    if (results.length > 0 && results[0].values.length > 0) {
+      const [triggerCombId, completedIds] = results[0].values[0];
+      const instructionIds = JSON.parse(completedIds as string) as string[];
+      const success = outcome === 'prevented' || outcome === 'reduced' ? 1 : 0;
+      const failure = success ? 0 : 1;
+
+      instructionIds.forEach((instructionId: string) => {
+        this.db!.run(
+          `INSERT INTO intervention_effectiveness 
+           (instruction_id, trigger_combination_id, success_count, failure_count, last_used)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(instruction_id, trigger_combination_id) 
+           DO UPDATE SET 
+             success_count = success_count + ?,
+             failure_count = failure_count + ?,
+             last_used = ?`,
+          [
+            instructionId,
+            triggerCombId,
+            success,
+            failure,
+            new Date().toISOString(),
+            success,
+            failure,
+            new Date().toISOString(),
+          ]
+        );
+      });
+    }
+
+    await this.saveToIndexedDB();
+  }
+
+  /**
+   * Get intervention effectiveness data
+   */
+  async getInterventionEffectiveness(): Promise<InterventionEffectiveness[]> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const results = this.db.exec(`
+      SELECT 
+        instruction_id,
+        trigger_combination_id,
+        success_count,
+        failure_count,
+        last_used,
+        CAST(success_count AS FLOAT) / (success_count + failure_count) as average_effectiveness
+      FROM intervention_effectiveness
+      WHERE success_count + failure_count > 0
+      ORDER BY average_effectiveness DESC
+    `);
+
+    if (!results || results.length === 0) return [];
+
+    return results[0].values.map(row => ({
+      instructionId: row[0] as string,
+      triggerCombinationId: row[1] as string,
+      successCount: row[2] as number,
+      failureCount: row[3] as number,
+      lastUsed: row[4] as string,
+      averageEffectiveness: row[5] as number,
+    }));
+  }
+
+  /**
+   * Get sessions pending follow-up
+   */
+  async getPendingFollowUps(): Promise<any[]> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    const results = this.db.exec(`
+      SELECT id, trigger_labels, follow_up_at
+      FROM soothemode_sessions
+      WHERE outcome IS NULL 
+        AND follow_up_at IS NOT NULL
+        AND follow_up_at <= ?
+      ORDER BY follow_up_at ASC
+    `, [new Date().toISOString()]);
+
+    if (!results || results.length === 0) return [];
+
+    return results[0].values.map(row => ({
+      id: row[0] as string,
+      triggerLabels: row[1] as string,
+      followUpAt: row[2] as string,
+    }));
   }
 
   // ==================== Utility Operations ====================

@@ -1,16 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX } from 'lucide-react';
+import { X, Volume2, VolumeX, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
+import { RiskVariable, TriggerCombination, InterventionInstruction } from '../types';
+import { detectTriggerCombination, generateInstructions } from '../utils/sootheModeInstructions';
+import { sqliteService } from '../services/sqliteService';
 
 interface SootheModeProps {
   onClose: () => void;
+  riskVariables: RiskVariable[];
+  riskPercentage: number;
 }
 
-export function SootheMode({ onClose }: SootheModeProps) {
+export function SootheMode({ onClose, riskVariables, riskPercentage }: SootheModeProps) {
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [isRunning, setIsRunning] = useState(true);
   const [isDimmed, setIsDimmed] = useState(false);
   const [isSoundOn, setIsSoundOn] = useState(true);
+  const [instructions, setInstructions] = useState<InterventionInstruction[]>([]);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [triggerCombination, setTriggerCombination] = useState<TriggerCombination | null>(null);
+  const [sessionId] = useState(() => `session_${Date.now()}`);
+  const [showWhyExpanded, setShowWhyExpanded] = useState(false);
+
+  // Load personalized instructions on mount
+  useEffect(() => {
+    async function loadInstructions() {
+      try {
+        const historicalData = await sqliteService.getInterventionEffectiveness();
+        
+        const triggers = detectTriggerCombination(riskVariables, riskPercentage);
+        const personalizedInstructions = generateInstructions(triggers, historicalData);
+        
+        setTriggerCombination(triggers);
+        setInstructions(personalizedInstructions);
+      } catch (error) {
+        console.error('Failed to load instructions:', error);
+      }
+    }
+    
+    loadInstructions();
+  }, [riskVariables, riskPercentage]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -39,6 +68,36 @@ export function SootheMode({ onClose }: SootheModeProps) {
     setIsRunning(true);
   };
 
+  const handleClose = async () => {
+    // Save session data
+    try {
+      if (triggerCombination) {
+        await sqliteService.saveSootheModeSession({
+          id: sessionId,
+          startedAt: new Date().toISOString(),
+          triggerCombination,
+          instructions,
+          completedInstructionIds: Array.from(completedIds),
+          durationMinutes: (300 - timeRemaining) / 60,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save session:', error);
+    }
+    
+    onClose();
+  };
+
+  const toggleInstruction = (instructionId: string) => {
+    const newCompleted = new Set(completedIds);
+    if (newCompleted.has(instructionId)) {
+      newCompleted.delete(instructionId);
+    } else {
+      newCompleted.add(instructionId);
+    }
+    setCompletedIds(newCompleted);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Dim overlay */}
@@ -49,7 +108,7 @@ export function SootheMode({ onClose }: SootheModeProps) {
       {/* Close button - Fixed at top with higher z-index */}
       <div className="relative z-10 flex justify-end px-6 pt-6">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="p-2 transition-colors rounded-lg text-foreground hover:text-muted-foreground bg-card/80"
           aria-label="Close soothe mode"
           style={{ minWidth: '44px', minHeight: '44px' }}
@@ -59,85 +118,78 @@ export function SootheMode({ onClose }: SootheModeProps) {
       </div>
 
       {/* Content */}
-      <div className="relative flex flex-col items-center justify-center flex-1 px-6 pb-8">
+      <div className="relative flex flex-col items-center flex-1 px-6 pb-8 pt-6 overflow-y-auto">
 
-        {/* Timer display */}
-        <div className="mb-12 space-y-8 text-center">
-          <h1 className="text-display">{formatTime(timeRemaining)}</h1>
-          <p className="max-w-xs text-body text-muted-foreground">
-            {timeRemaining === 0
-              ? 'Session complete. How are you feeling?'
-              : 'Focus on your breath. In through your nose, out through your mouth.'}
-          </p>
-        </div>
-
-        {/* Breathing visual */}
-        <div
-          className="flex items-center justify-center w-32 h-32 mb-12 rounded-full bg-primary/20"
-          style={{
-            animation: isRunning ? 'breathe 4s ease-in-out infinite' : 'none',
-          }}
-        >
-          <div className="w-24 h-24 rounded-full bg-primary/40" />
-        </div>
-
-        {/* Settings - Moved above action buttons */}
-        <div className="w-full max-w-sm mb-8">
-          <div className="flex items-center justify-center gap-8">
+        {/* Personalized Instructions Section */}
+        {triggerCombination && instructions.length > 0 && (
+          <div className="w-full max-w-md mb-8 space-y-4">
+            {/* Trigger Context */}
+            <div className="p-4 rounded-xl bg-warning/10 border border-warning/20">
+              <p className="text-sm text-muted-foreground mb-1">Based on your current triggers:</p>
+              <p className="text-body font-medium">{triggerCombination.label}</p>
+            </div>
+            
+            {/* Instructions Checklist */}
+            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
+              <h3 className="text-h3 mb-3">Prevention Checklist</h3>
+              {instructions.map((instruction) => (
+                <label
+                  key={instruction.id}
+                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={completedIds.has(instruction.id)}
+                    onChange={() => toggleInstruction(instruction.id)}
+                    className="mt-0.5 w-5 h-5 rounded border-2 border-primary text-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                  <div className="flex-1">
+                    <p className={`text-body ${completedIds.has(instruction.id) ? 'line-through text-muted-foreground' : ''}`}>
+                      {instruction.text}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ~{instruction.estimatedMinutes} min · {instruction.category}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            
+            {/* Why These Steps? Expandable */}
             <button
-              onClick={() => setIsDimmed(!isDimmed)}
-              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
-              style={{ minWidth: '44px', minHeight: '44px' }}
+              onClick={() => setShowWhyExpanded(!showWhyExpanded)}
+              className="w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left"
             >
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
-                <span className="text-lg">{isDimmed ? '◐' : '○'}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-body-sm font-medium">Why these steps?</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showWhyExpanded ? 'rotate-180' : ''}`} />
               </div>
-              <span className="text-xs">
-                {isDimmed ? 'Dimmed' : 'Dim screen'}
-              </span>
             </button>
-            <button
-              onClick={() => setIsSoundOn(!isSoundOn)}
-              className="flex flex-col items-center gap-2 p-2 transition-colors text-muted-foreground hover:text-foreground"
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
-                {isSoundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+            
+            {showWhyExpanded && (
+              <div className="p-4 rounded-lg bg-muted/30 space-y-2 text-body-sm text-muted-foreground">
+                <p>These interventions have been effective for similar trigger patterns:</p>
+                <ul className="space-y-1 ml-4">
+                  {instructions.map((inst) => (
+                    <li key={inst.id} className="list-disc">
+                      {inst.text} - {inst.evidenceLevel === 'high' ? '✓ Clinical evidence' : inst.evidenceLevel === 'moderate' ? '✓ Moderate evidence' : '✓ Works for you'}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <span className="text-xs">{isSoundOn ? 'Sound on' : 'Sound off'}</span>
-            </button>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="w-full max-w-sm space-y-3">
-          {timeRemaining === 0 ? (
-            <Button
-              onClick={onClose}
-              className="w-full h-12"
-              style={{ borderRadius: '12px' }}
-            >
-              Back to home
-            </Button>
-          ) : (
-            <>
-              <Button
-                onClick={onClose}
-                variant="outline"
-                className="w-full h-12"
-                style={{ borderRadius: '12px' }}
-              >
-                End early
-              </Button>
-              <Button
-                onClick={handleKeepGoing}
-                className="w-full h-12"
-                style={{ borderRadius: '12px' }}
-              >
-                Keep going
-              </Button>
-            </>
-          )}
+          <Button
+            onClick={handleClose}
+            className="w-full h-12"
+            style={{ borderRadius: '12px' }}
+          >
+            Done
+          </Button>
         </div>
       </div>
 
