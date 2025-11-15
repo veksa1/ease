@@ -86,9 +86,37 @@ class SQLiteService {
       )
     `);
 
+    // Migraine reports
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS migraine_reports (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        onset_at TEXT NOT NULL,
+        duration_hours REAL,
+        severity INTEGER NOT NULL,
+        aura_present INTEGER,
+        aura_types TEXT,
+        pain_character TEXT,
+        symptoms TEXT NOT NULL,
+        triggers TEXT NOT NULL,
+        other_trigger_notes TEXT,
+        notes TEXT,
+        medication_taken TEXT,
+        medication_timing TEXT,
+        relief_level TEXT,
+        impact_missed_work INTEGER,
+        impact_had_to_rest INTEGER,
+        impact_score INTEGER,
+        created_at TEXT NOT NULL
+      )
+    `);
+
     // Create indices for faster queries
     this.db.run('CREATE INDEX IF NOT EXISTS idx_timeline_date ON timeline_entries(date)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_experiment_name ON experiments(experiment_name)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_onset ON migraine_reports(onset_at)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_severity ON migraine_reports(severity)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_migraine_created ON migraine_reports(created_at)');
 
     await this.saveToIndexedDB();
   }
