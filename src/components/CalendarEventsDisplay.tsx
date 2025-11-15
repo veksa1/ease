@@ -24,9 +24,10 @@ interface CalendarEventsDisplayProps {
   userId: string;
   date?: Date;
   compact?: boolean;
+  onNavigateToProfile?: () => void;
 }
 
-export function CalendarEventsDisplay({ userId, date = new Date(), compact = false }: CalendarEventsDisplayProps) {
+export function CalendarEventsDisplay({ userId, date = new Date(), compact = false, onNavigateToProfile }: CalendarEventsDisplayProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +114,10 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
             <p className="text-sm text-muted-foreground mb-3">
               Connect your calendar to see upcoming events and get better predictions.
             </p>
-            <button className="text-sm text-primary font-medium hover:underline flex items-center gap-1">
+            <button 
+              onClick={onNavigateToProfile}
+              className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+            >
               Connect Calendar
               <ExternalLink className="w-3 h-3" />
             </button>

@@ -450,6 +450,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                       userId="demo-user"
                       date={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay)}
                       compact={true}
+                      onNavigateToProfile={() => onNavigate?.('profile')}
                     />
                   </div>
 

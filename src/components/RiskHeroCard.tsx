@@ -84,7 +84,7 @@ export function RiskHeroCard({
     personal: '👤 Personal',
   };
 
-  const defaultOpenCategories = Object.keys(groupedContributors) as string[];
+  const defaultOpenCategories: string[] = [];
 
   const getGradientClasses = () => {
     if (riskLevel === 'low') {
@@ -168,7 +168,7 @@ export function RiskHeroCard({
                             <div className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-md bg-card/80 shadow-sm flex-shrink-0">
                               <HelpCircle className="w-4 h-4 text-muted-foreground" />
                             </div>
-                            <span className="text-sm md:text-base font-medium whitespace-nowrap">{variable.name}</span>
+                            <span className="text-sm md:text-base font-medium whitespace-nowrap text-foreground">{variable.name}</span>
                             <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">
                               {variable.value}{variable.unit ? ` ${variable.unit}` : ''}
                             </span>
@@ -176,7 +176,7 @@ export function RiskHeroCard({
                               className={`inline-flex items-center justify-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-md shadow-sm ${getPercentageBadgeColor(variable.percentage)}`}
                               style={{ borderRadius: '8px', minWidth: '56px' }}
                             >
-                              <span className={`text-xs md:text-sm font-semibold ${getInfluenceColor(variable.percentage)}`}>
+                              <span className="text-xs md:text-sm font-semibold">
                                 {variable.percentage}%
                               </span>
                             </span>
