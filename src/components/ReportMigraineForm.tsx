@@ -34,6 +34,7 @@ import { getMigraineService } from '../services/migraineService';
 interface ReportMigraineFormProps {
   onClose: () => void;
   onSuccess?: () => void;
+  initialDate?: Date;
 }
 
 // UI configuration for symptoms
@@ -78,12 +79,12 @@ const TRIGGER_OPTIONS: TriggerOption[] = [
   { id: 'other', label: 'Other', category: 'lifestyle' },
 ];
 
-export function ReportMigraineForm({ onClose, onSuccess }: ReportMigraineFormProps) {
+export function ReportMigraineForm({ onClose, onSuccess, initialDate }: ReportMigraineFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   // Form state
-  const [onsetDate, setOnsetDate] = useState(new Date());
+  const [onsetDate, setOnsetDate] = useState(initialDate || new Date());
   const [durationHours, setDurationHours] = useState<number | undefined>();
   const [severity, setSeverity] = useState(5);
   const [auraPresent, setAuraPresent] = useState(false);

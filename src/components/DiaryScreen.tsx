@@ -20,6 +20,7 @@ import { DayDetailsScreen } from './DayDetailsScreen';
 import { BottomNav } from './BottomNav';
 import { useCalendar } from '../hooks/useDemoData';
 import { CalendarEventsDisplay } from './CalendarEventsDisplay';
+import { ReportMigraineModal } from './ReportMigraineMigral';
 
 // Mock data types
 type RiskLevel = 'low' | 'medium' | 'high' | null;
@@ -54,6 +55,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
   const [selectedDay, setSelectedDay] = useState<number | null>(16);
   const [activeFilters, setActiveFilters] = useState<FilterType[]>(['predictions', 'attacks', 'triggers']);
   const [showDayDetails, setShowDayDetails] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Load real calendar data
   const { loading, calendarDays } = useCalendar(
@@ -488,7 +490,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                   <Button
                     className="h-10 md:h-12 rounded-lg text-sm md:text-base"
                     style={{ borderRadius: '8px' }}
-                    onClick={() => alert('Add entry functionality')}
+                    onClick={() => setShowReportModal(true)}
                   >
                     Add entry
                   </Button>
@@ -521,6 +523,13 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
       <BottomNav 
         activeTab="diary" 
         onNavigate={onNavigate || ((tab) => tab === 'home' && onBack?.())} 
+      />
+
+      {/* Migraine Report Modal */}
+      <ReportMigraineModal
+        open={showReportModal}
+        onOpenChange={setShowReportModal}
+        initialDate={selectedDay ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay) : undefined}
       />
     </div>
   );

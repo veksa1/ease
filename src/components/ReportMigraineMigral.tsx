@@ -18,12 +18,14 @@ interface ReportMigraineModalProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  initialDate?: Date;
 }
 
 export function ReportMigraineModal({
   trigger,
   open,
   onOpenChange,
+  initialDate,
 }: ReportMigraineModalProps) {
   const [isOpen, setIsOpen] = useState(open ?? false);
 
@@ -51,7 +53,11 @@ export function ReportMigraineModal({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       {isOpen && (
         <div className="fixed inset-0 z-50">
-          <ReportMigraineForm onClose={handleClose} onSuccess={handleSuccess} />
+          <ReportMigraineForm 
+            onClose={handleClose} 
+            onSuccess={handleSuccess} 
+            initialDate={initialDate}
+          />
         </div>
       )}
     </Dialog>
