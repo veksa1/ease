@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Mic,
   Square,
@@ -12,6 +6,7 @@ import {
   Volume2,
   AlertTriangle,
   ArrowLeft,
+  CheckCircle2,
   RefreshCcw,
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -95,6 +90,7 @@ const MIGRAINE_TOOL_SCHEMA = {
 
 const AUDIO_POST_BUFFER_GRACE_MS = 600;
 const AUDIO_FALLBACK_TIMEOUT_MS = 3000;
+const COMPLETION_TRANSITION_DELAY_MS = 1200;
 
 type AssistantStatus =
   | 'idle'
@@ -173,7 +169,6 @@ export function VoiceMigraineAssistant({
   const [structuredReport, setStructuredReport] = useState<MigraineReportFormData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastUserSpeechAt, setLastUserSpeechAt] = useState<number | null>(null);
-  const [lastSavedReport, setLastSavedReport] = useState<MigraineReportFormData | null>(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -184,6 +179,8 @@ export function VoiceMigraineAssistant({
   const pendingTeardownAfterAudio = useRef(false);
   const audioGraceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingCompletionClose = useRef(false);
   const processedFunctionCallIds = useRef<Set<string>>(new Set());
 
   const clearAudioCompletionTimers = useCallback(() => {
@@ -196,6 +193,25 @@ export function VoiceMigraineAssistant({
       audioFallbackTimeoutRef.current = null;
     }
   }, []);
+
+  const resetCompletionFlow = useCallback(() => {
+    pendingCompletionClose.current = false;
+    if (completionDelayTimeoutRef.current) {
+      clearTimeout(completionDelayTimeoutRef.current);
+      completionDelayTimeoutRef.current = null;
+    }
+  }, []);
+
+  const maybeCloseAfterCalm = useCallback(() => {
+    if (!pendingCompletionClose.current || completionDelayTimeoutRef.current) {
+      return;
+    }
+    completionDelayTimeoutRef.current = setTimeout(() => {
+      pendingCompletionClose.current = false;
+      completionDelayTimeoutRef.current = null;
+      onSaved?.();
+    }, COMPLETION_TRANSITION_DELAY_MS);
+  }, [onSaved]);
 
   const teardownSession = useCallback(() => {
     clearAudioCompletionTimers();
@@ -210,7 +226,13 @@ export function VoiceMigraineAssistant({
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
     }
-  }, [clearAudioCompletionTimers]);
+
+    if (pendingCompletionClose.current) {
+      maybeCloseAfterCalm();
+    } else {
+      resetCompletionFlow();
+    }
+  }, [clearAudioCompletionTimers, maybeCloseAfterCalm, resetCompletionFlow]);
 
   const stopListening = useCallback(() => {
     teardownSession();
@@ -255,14 +277,13 @@ export function VoiceMigraineAssistant({
         console.log('[VoiceMigraineAssistant] Saving report', payload);
         await service.createReport(payload);
         setStatus('saved');
-        setLastSavedReport(payload);
+        pendingCompletionClose.current = true;
         if (delayTeardown) {
           clearAudioCompletionTimers();
           pendingTeardownAfterAudio.current = true;
         } else {
           teardownSession();
         }
-        onSaved?.();
       } catch (err) {
         console.error('[VoiceAssistant] Failed to save report', err);
         setError('Unable to save the migraine report. Please try again.');
@@ -271,7 +292,7 @@ export function VoiceMigraineAssistant({
         setIsSaving(false);
       }
     },
-    [structuredReport, collectedData, onSaved, teardownSession, clearAudioCompletionTimers]
+    [structuredReport, collectedData, teardownSession, clearAudioCompletionTimers]
   );
 
   const handleFunctionCall = useCallback(
@@ -316,7 +337,6 @@ export function VoiceMigraineAssistant({
               item: {
                 type: 'message',
                 role: 'user',
-                metadata: { tool_call_id: callId },
                 content: [
                   {
                     type: 'input_text',
@@ -326,7 +346,6 @@ export function VoiceMigraineAssistant({
               },
             })
           );
-          dataChannelRef.current?.send(JSON.stringify({ type: 'response.create' }));
         }
       } catch (error) {
         console.error('[VoiceAssistant] Failed to handle function call', error, functionPart);
@@ -492,7 +511,16 @@ export function VoiceMigraineAssistant({
         }
         case 'response.error':
         case 'error': {
-          setError(payload.error?.message || 'Voice assistant error');
+          const errMessage = payload.error?.message || 'Voice assistant error';
+          const errCode = payload.error?.code;
+          if (
+            errCode === 'response_already_in_progress' ||
+            errMessage.toLowerCase().includes('active response in progress')
+          ) {
+            console.debug('[VoiceAssistant] Ignoring benign response error', payload);
+            break;
+          }
+          setError(errMessage);
           setStatus('error');
           break;
         }
@@ -555,8 +583,8 @@ export function VoiceMigraineAssistant({
       triggers: [],
     });
     setLastUserSpeechAt(null);
-    setLastSavedReport(null);
     pendingTeardownAfterAudio.current = false;
+    resetCompletionFlow();
     processedFunctionCallIds.current.clear();
     assistantBuffers.current = {};
     metadataBuffer.current = '';
@@ -793,12 +821,27 @@ export function VoiceMigraineAssistant({
         </div>
       </div>
 
-      {lastSavedReport && (
-        <div className="border-t border-border bg-background/90 p-4 text-xs text-muted-foreground overflow-y-auto max-h-48">
-          <p className="font-semibold mb-2 text-foreground">Saved report payload</p>
-          <pre className="whitespace-pre-wrap break-words text-[11px]">
-            {JSON.stringify(lastSavedReport, null, 2)}
-          </pre>
+      {(status === 'saving' || status === 'saved') && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/75 px-6 backdrop-blur-sm">
+          <div
+            className="pointer-events-auto w-full max-w-sm flex flex-col items-center gap-3 rounded-3xl bg-card/95 px-6 py-6 text-center shadow-lg"
+            role="status"
+            aria-live="polite"
+          >
+            {status === 'saving' ? (
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            ) : (
+              <CheckCircle2 className="h-8 w-8 text-success" />
+            )}
+            <p className="text-h4 text-balance">
+              {status === 'saving' ? 'Saving your report' : 'Report saved'}
+            </p>
+            <p className="text-sm text-muted-foreground text-pretty">
+              {status === 'saving'
+                ? 'Stay relaxed while we sync everything securely.'
+                : 'Dr. Ease is wrapping up. You will return shortly.'}
+            </p>
+          </div>
         </div>
       )}
     </div>
