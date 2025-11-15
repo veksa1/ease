@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { PersonalMigraineProfile } from '../types';
+import React, { useState, useEffect } from 'react';
+import { PersonalMigraineProfile, TriggerHypothesis } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { sqliteService } from '../services/sqliteService';
+import { TRIGGER_STRINGS, PREDEFINED_TRIGGERS, TriggerKey } from '../utils/triggerStrings';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
 
 interface OnboardingPersonalDetailsStepProps {
   initialValue?: Partial<PersonalMigraineProfile>;
@@ -24,8 +27,124 @@ export function OnboardingPersonalDetailsStep({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Trigger hypothesis state
+  const [selectedTriggers, setSelectedTriggers] = useState<Set<TriggerKey>>(new Set());
+  const [triggerDetails, setTriggerDetails] = useState<Map<TriggerKey, Partial<TriggerHypothesis>>>(new Map());
+  const [expandedTriggers, setExpandedTriggers] = useState<Set<TriggerKey>>(new Set());
+
+  const MAX_TRIGGERS = 5;
+
+  // Load existing trigger hypotheses on mount
+  useEffect(() => {
+    const loadTriggerHypotheses = async () => {
+      try {
+        const hypotheses = await sqliteService.getTriggerHypotheses();
+        const selected = new Set<TriggerKey>();
+        const details = new Map<TriggerKey, Partial<TriggerHypothesis>>();
+        
+        hypotheses.forEach(h => {
+          if (h.key in TRIGGER_STRINGS.triggers) {
+            selected.add(h.key as TriggerKey);
+            details.set(h.key as TriggerKey, h);
+          }
+        });
+        
+        setSelectedTriggers(selected);
+        setTriggerDetails(details);
+      } catch (err) {
+        console.error('Failed to load trigger hypotheses:', err);
+      }
+    };
+    
+    loadTriggerHypotheses();
+  }, []);
+
   const updateField = <K extends keyof PersonalMigraineProfile>(key: K, value: PersonalMigraineProfile[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleTrigger = (key: TriggerKey) => {
+    setSelectedTriggers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+        // Remove from details and expanded
+        setTriggerDetails(prevDetails => {
+          const newDetails = new Map(prevDetails);
+          newDetails.delete(key);
+          return newDetails;
+        });
+        setExpandedTriggers(prevExpanded => {
+          const newExpanded = new Set(prevExpanded);
+          newExpanded.delete(key);
+          return newExpanded;
+        });
+      } else {
+        if (newSet.size >= MAX_TRIGGERS) {
+          setError(TRIGGER_STRINGS.maxReachedWarning);
+          setTimeout(() => setError(null), 3000);
+          return prev;
+        }
+        newSet.add(key);
+        // Initialize with default confidence
+        setTriggerDetails(prevDetails => {
+          const newDetails = new Map(prevDetails);
+          newDetails.set(key, { confidence: 0.5 });
+          return newDetails;
+        });
+      }
+      return newSet;
+    });
+  };
+
+  const updateTriggerDetail = <K extends keyof TriggerHypothesis>(
+    triggerKey: TriggerKey,
+    field: K,
+    value: TriggerHypothesis[K]
+  ) => {
+    setTriggerDetails(prev => {
+      const newDetails = new Map(prev);
+      const current = newDetails.get(triggerKey) || {};
+      newDetails.set(triggerKey, { ...current, [field]: value });
+      return newDetails;
+    });
+  };
+
+  const toggleExpanded = (key: TriggerKey) => {
+    setExpandedTriggers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const saveTriggerHypothesis = async (key: TriggerKey) => {
+    const details = triggerDetails.get(key);
+    if (!details || details.confidence === undefined) {
+      return;
+    }
+
+    try {
+      const hypothesis: Omit<TriggerHypothesis, 'createdAt' | 'updatedAt'> = {
+        id: `trigger_${key}_${Date.now()}`,
+        key,
+        label: TRIGGER_STRINGS.triggers[key],
+        confidence: details.confidence,
+        freqPerMonth: details.freqPerMonth,
+        threshold: details.threshold,
+        onsetWindowHours: details.onsetWindowHours,
+        helps: details.helps,
+        notes: details.notes,
+      };
+
+      await sqliteService.saveTriggerHypothesis(hypothesis);
+    } catch (err) {
+      console.error('Failed to save trigger hypothesis:', err);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,8 +177,39 @@ export function OnboardingPersonalDetailsStep({
       return;
     }
 
+    // Validate trigger hypotheses
+    for (const key of selectedTriggers) {
+      const details = triggerDetails.get(key);
+      if (!details || details.confidence === undefined) {
+        setError(`${TRIGGER_STRINGS.triggers[key]}: ${TRIGGER_STRINGS.validation.confidenceRequired}`);
+        return;
+      }
+      if (details.freqPerMonth !== undefined && details.freqPerMonth < 0) {
+        setError(`${TRIGGER_STRINGS.triggers[key]}: ${TRIGGER_STRINGS.validation.frequencyNegative}`);
+        return;
+      }
+      if (details.onsetWindowHours !== undefined && details.onsetWindowHours < 0) {
+        setError(`${TRIGGER_STRINGS.triggers[key]}: ${TRIGGER_STRINGS.validation.onsetNegative}`);
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
+
+      // Save all trigger hypotheses
+      for (const key of selectedTriggers) {
+        await saveTriggerHypothesis(key);
+      }
+
+      // Delete any deselected triggers
+      const existingHypotheses = await sqliteService.getTriggerHypotheses();
+      for (const h of existingHypotheses) {
+        if (!selectedTriggers.has(h.key as TriggerKey)) {
+          await sqliteService.deleteTriggerHypothesis(h.id);
+        }
+      }
+
       await onSubmit(form);
     } catch (err) {
       console.error(err);
@@ -154,6 +304,201 @@ export function OnboardingPersonalDetailsStep({
               onChange={e => updateField('bmi', e.target.value ? Number(e.target.value) : undefined)}
             />
           </div>
+        </div>
+
+        {/* Trigger Hypotheses Section */}
+        <div className="space-y-4 pt-4 border-t border-border">
+          <div className="space-y-2">
+            <h2 className="text-h3 font-semibold">{TRIGGER_STRINGS.sectionTitle}</h2>
+            <p className="text-sm text-muted-foreground">
+              {TRIGGER_STRINGS.sectionDescription}
+            </p>
+            <p className="text-sm font-medium text-primary">
+              {TRIGGER_STRINGS.selectedCounter(selectedTriggers.size, MAX_TRIGGERS)}
+            </p>
+          </div>
+
+          {/* Trigger Selection Grid */}
+          <div className="flex flex-wrap gap-2">
+            {PREDEFINED_TRIGGERS.map(key => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleTrigger(key)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedTriggers.has(key)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+                style={{ borderRadius: '8px' }}
+              >
+                {TRIGGER_STRINGS.triggers[key]}
+              </button>
+            ))}
+          </div>
+
+          {/* Expandable Cards for Selected Triggers */}
+          {Array.from(selectedTriggers).map(key => {
+            const details = triggerDetails.get(key) || {};
+            const isExpanded = expandedTriggers.has(key);
+            
+            return (
+              <div
+                key={key}
+                className="border border-border rounded-xl p-4 space-y-3"
+                style={{ borderRadius: '12px' }}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-base">{TRIGGER_STRINGS.triggers[key]}</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(key)}
+                      className="text-sm text-primary hover:text-primary/80 flex items-center gap-1"
+                    >
+                      {isExpanded ? (
+                        <>
+                          {TRIGGER_STRINGS.collapseButton}
+                          <ChevronUp className="h-4 w-4" />
+                        </>
+                      ) : (
+                        <>
+                          {TRIGGER_STRINGS.expandButton}
+                          <ChevronDown className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleTrigger(key)}
+                      className="text-sm text-critical hover:text-critical/80 flex items-center gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confidence - Always visible */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{TRIGGER_STRINGS.confidenceLabel}</Label>
+                  <div className="flex gap-2">
+                    {TRIGGER_STRINGS.confidenceOptions.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => updateTriggerDetail(key, 'confidence', option.value)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          details.confidence === option.value
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }`}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <div className="space-y-3 pt-2">
+                    {/* Frequency */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`freq-${key}`} className="text-sm">
+                        {TRIGGER_STRINGS.frequencyLabel}
+                      </Label>
+                      <Input
+                        id={`freq-${key}`}
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        inputMode="decimal"
+                        placeholder={TRIGGER_STRINGS.frequencyPlaceholder}
+                        className="h-10 text-sm"
+                        style={{ borderRadius: '8px' }}
+                        value={details.freqPerMonth?.toString() ?? ''}
+                        onChange={e => updateTriggerDetail(key, 'freqPerMonth', e.target.value ? Number(e.target.value) : undefined)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                      />
+                    </div>
+
+                    {/* Threshold */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`threshold-${key}`} className="text-sm">
+                        {TRIGGER_STRINGS.thresholdLabel}
+                      </Label>
+                      <Input
+                        id={`threshold-${key}`}
+                        type="text"
+                        placeholder={TRIGGER_STRINGS.thresholdPlaceholder}
+                        className="h-10 text-sm"
+                        style={{ borderRadius: '8px' }}
+                        value={details.threshold ?? ''}
+                        onChange={e => updateTriggerDetail(key, 'threshold', e.target.value)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                      />
+                    </div>
+
+                    {/* Onset Window */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`onset-${key}`} className="text-sm">
+                        {TRIGGER_STRINGS.onsetWindowLabel}
+                      </Label>
+                      <Input
+                        id={`onset-${key}`}
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        inputMode="decimal"
+                        placeholder={TRIGGER_STRINGS.onsetWindowPlaceholder}
+                        className="h-10 text-sm"
+                        style={{ borderRadius: '8px' }}
+                        value={details.onsetWindowHours?.toString() ?? ''}
+                        onChange={e => updateTriggerDetail(key, 'onsetWindowHours', e.target.value ? Number(e.target.value) : undefined)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                      />
+                    </div>
+
+                    {/* Helps */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`helps-${key}`} className="text-sm">
+                        {TRIGGER_STRINGS.helpsLabel}
+                      </Label>
+                      <Input
+                        id={`helps-${key}`}
+                        type="text"
+                        placeholder={TRIGGER_STRINGS.helpsPlaceholder}
+                        className="h-10 text-sm"
+                        style={{ borderRadius: '8px' }}
+                        value={details.helps ?? ''}
+                        onChange={e => updateTriggerDetail(key, 'helps', e.target.value)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`notes-${key}`} className="text-sm">
+                        {TRIGGER_STRINGS.notesLabel}
+                      </Label>
+                      <Input
+                        id={`notes-${key}`}
+                        type="text"
+                        placeholder={TRIGGER_STRINGS.notesPlaceholder}
+                        className="h-10 text-sm"
+                        style={{ borderRadius: '8px' }}
+                        value={details.notes ?? ''}
+                        onChange={e => updateTriggerDetail(key, 'notes', e.target.value)}
+                        onBlur={() => saveTriggerHypothesis(key)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
