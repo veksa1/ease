@@ -196,12 +196,37 @@ jupyter notebook notebooks/rolling_risk_curves.ipynb
 
 ## 🐳 Docker Deployment
 
+### Local Development
 ```bash
 # Build and run with Docker Compose
 docker-compose up --build
 
 # Service will be available at http://localhost:8000
 ```
+
+### Production Deployment to Google Cloud
+
+Deploy the ALINE service to Google Cloud Run for production use:
+
+```bash
+# Quick deployment (after setup)
+git push origin main  # Triggers automatic deployment via GitHub Actions
+```
+
+**Features:**
+- ✅ Serverless deployment with auto-scaling
+- ✅ Automatic CI/CD via GitHub Actions
+- ✅ HTTPS endpoints with custom domains
+- ✅ Cost-effective (free tier available)
+
+**Setup Guide:** See [DEPLOYMENT_QUICKSTART.md](./DEPLOYMENT_QUICKSTART.md) for a 3-step setup guide.
+
+**Complete Documentation:** [GOOGLE_CLOUD_DEPLOYMENT.md](./GOOGLE_CLOUD_DEPLOYMENT.md) includes:
+- GCP project setup
+- GitHub Actions configuration
+- Security best practices
+- Monitoring and troubleshooting
+- Cost optimization tips
 
 ## 📝 Citation
 

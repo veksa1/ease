@@ -1,0 +1,71 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Development files
+.git/
+.github/
+.gitignore
+*.md
+!README.md
+
+# Testing
+tests/
+*.pytest_cache/
+.coverage
+
+# Documentation
+docs/
+notebooks/
+examples/
+
+# Data and artifacts (these should be loaded from Cloud Storage in production)
+data/*.csv
+data/*.json
+data/*.pkl
+artifacts/
+reports/
+runs/
+!runs/checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Scripts (not needed in production)
+scripts/train_aline.py
+scripts/simulator.py
+scripts/eval.py
+scripts/test_*.py
+scripts/generate_*.py
+
+# Visualization
+viz/
+
+# Tickets
+tickets/

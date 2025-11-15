@@ -63,10 +63,23 @@ app_state = {
 def load_model_and_config():
     """Load model and configuration at startup"""
     try:
+        import os
+        import re
+        
         # Load service config
         config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
         with open(config_path) as f:
-            service_config = yaml.safe_load(f)
+            config_content = f.read()
+            # Expand environment variables in format ${VAR:default}
+            def expand_env_var(match):
+                var_expr = match.group(1)
+                if ':' in var_expr:
+                    var_name, default = var_expr.split(':', 1)
+                    return os.getenv(var_name.strip(), default.strip())
+                else:
+                    return os.getenv(var_expr.strip(), '')
+            config_content = re.sub(r'\$\{([^}]+)\}', expand_env_var, config_content)
+            service_config = yaml.safe_load(config_content)
         
         # Load model config
         model_config_path = Path(__file__).parent.parent / service_config['model']['config_path']
@@ -458,16 +471,20 @@ async def generate_context(request: ContextGenerationRequest):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
     
     # Load config for server settings
     config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
+    # Use PORT env var if available (for Cloud Run compatibility)
+    port = int(os.getenv('PORT', config['server']['port']))
+    
     uvicorn.run(
         "main:app",
         host=config['server']['host'],
-        port=config['server']['port'],
+        port=port,
         reload=config['server']['reload'],
         workers=config['server']['workers']
     )
