@@ -21,6 +21,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import logging
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -48,20 +49,30 @@ class LazyMigraineDataset(Dataset):
         # Pre-group by user for fast access
         logger.info("Grouping data by user...")
         self.user_data = {}
-        for user_id, group in self.df.groupby('user_id'):
+        
+        # Use tqdm for grouping progress
+        for user_id, group in tqdm(self.df.groupby('user_id'), desc="Grouping by user", unit="user"):
             user_df = group.sort_values('day').reset_index(drop=True)
             self.user_data[user_id] = user_df
         
         # Create index: list of (user_id, start_idx) tuples
         logger.info("Creating sequence index...")
         self.sequence_index = []
-        for user_id, user_df in self.user_data.items():
+        
+        pbar = tqdm(self.user_data.items(), desc="Indexing sequences", unit="user")
+        for user_id, user_df in pbar:
             for i in range(len(user_df) - sequence_length):
                 self.sequence_index.append((user_id, i))
                 if max_sequences and len(self.sequence_index) >= max_sequences:
+                    pbar.set_description("Reached max_sequences limit")
                     break
+            
+            pbar.set_postfix({'sequences': len(self.sequence_index)})
+            
             if max_sequences and len(self.sequence_index) >= max_sequences:
                 break
+        
+        pbar.close()
         
         logger.info(f"Created index for {len(self.sequence_index)} sequences from {len(self.user_data)} users")
         logger.info(f"Memory usage: ~{self.df.memory_usage(deep=True).sum() / 1024**2:.1f} MB (just the dataframe)")

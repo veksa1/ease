@@ -1,42 +1,52 @@
 """
 Quick test to diagnose data loading performance
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import pandas as pd
 import time
-from pathlib import Path
+from multiprocessing import cpu_count
+
+# Import the new parallel dataset
+import torch
+from torch.utils.data import DataLoader
+import sys
+sys.path.append(str(Path(__file__).parent))
+from train_aline import MigraineDataset
 
 data_path = Path(__file__).parent.parent / 'data' / 'synthetic_migraine_train.csv'
 
 print(f"Loading {data_path}...")
+print(f"Available CPUs: {cpu_count()}")
+print()
+
+# Test with parallel dataset
+print("=" * 60)
+print("PARALLEL DATASET TEST")
+print("=" * 60)
+
 start = time.time()
-df = pd.read_csv(data_path)
-load_time = time.time() - start
+dataset = MigraineDataset(
+    csv_path=str(data_path),
+    sequence_length=24,
+    num_workers=max(1, cpu_count() - 1)  # Use all but one CPU
+)
+parallel_time = time.time() - start
 
-print(f"✓ Loaded in {load_time:.2f}s")
-print(f"  Rows: {len(df):,}")
-print(f"  Columns: {len(df.columns)}")
-print(f"  Users: {df['user_id'].nunique():,}")
-print(f"  Days per user (avg): {len(df) / df['user_id'].nunique():.1f}")
+print(f"\n✓ Parallel loading completed in {parallel_time:.2f}s")
+print(f"  Sequences: {len(dataset):,}")
+print(f"  Speedup vs estimated sequential: ~{84 / parallel_time:.1f}x")
 
-# Estimate sequence count
-users = df['user_id'].nunique()
-avg_days = len(df) / users
-sequence_length = 24
-estimated_sequences = int(users * (avg_days - sequence_length))
+# Test DataLoader
+print(f"\nTesting DataLoader with batch_size=32...")
+loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=0)
+batch = next(iter(loader))
+print(f"  Features shape: {batch['features'].shape}")
+print(f"  Latents shape: {batch['latents'].shape}")
+print(f"  Migraine next shape: {batch['migraine_next'].shape}")
 
-print(f"\nEstimated sequences (24-hour windows): {estimated_sequences:,}")
-print(f"  This would create ~{estimated_sequences * 24 * 20 * 8 / 1024**3:.2f} GB in memory (rough estimate)")
-
-# Time a small sample
-print("\nTiming sequence creation for first 10 users...")
-start = time.time()
-sequences = []
-for user_id in df['user_id'].unique()[:10]:
-    user_df = df[df['user_id'] == user_id].sort_values('day')
-    for i in range(len(user_df) - sequence_length):
-        window = user_df.iloc[i:i+sequence_length]
-        sequences.append({'len': len(window)})
-
-sample_time = time.time() - start
-print(f"✓ Created {len(sequences)} sequences in {sample_time:.2f}s")
-print(f"  Estimated total time for all users: {sample_time * users / 10 / 60:.1f} minutes")
+print("\n✅ Data loading test complete!")
+print(f"Total time: {parallel_time:.2f}s")
+print(f"\nMemory estimate: ~{len(dataset) * 24 * 20 * 8 / 1024**3:.2f} GB")

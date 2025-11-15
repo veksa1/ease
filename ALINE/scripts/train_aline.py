@@ -24,6 +24,9 @@ import yaml
 import json
 import logging
 from datetime import datetime
+from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
+from functools import partial
 from models.aline import SimpleALINE
 from sklearn.metrics import roc_auc_score, brier_score_loss
 
@@ -31,10 +34,43 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def _process_user_sequences(args):
+    """
+    Helper function to process sequences for a single user (for parallel processing).
+    
+    Args:
+        args: tuple of (user_id, user_df, feature_cols, latent_cols, sequence_length)
+    
+    Returns:
+        list of sequence dictionaries
+    """
+    user_id, user_data, feature_cols, latent_cols, sequence_length = args
+    
+    # Parse user data from dict (passed from main process)
+    user_df = pd.DataFrame(user_data)
+    user_df = user_df.sort_values('day').reset_index(drop=True)
+    
+    sequences = []
+    for i in range(len(user_df) - sequence_length):
+        features = user_df.loc[i:i+sequence_length-1, feature_cols].values
+        latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
+        migraine_next = user_df.loc[i+sequence_length, 'migraine']
+        migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
+        
+        sequences.append({
+            'features': features,
+            'latents': latents,
+            'migraine_next': migraine_next,
+            'migraine_prob_next': migraine_prob_next
+        })
+    
+    return sequences
+
+
 class MigraineDataset(Dataset):
     """Dataset for hourly migraine prediction with 24-hour windows"""
     
-    def __init__(self, csv_path, sequence_length=24, max_sequences=None):
+    def __init__(self, csv_path, sequence_length=24, max_sequences=None, num_workers=None):
         self.sequence_length = sequence_length
         
         logger.info(f"Loading data from {csv_path}...")
@@ -53,40 +89,49 @@ class MigraineDataset(Dataset):
         self.feature_cols = feature_cols
         self.latent_cols = latent_cols
         
-        logger.info(f"Creating sequences (this may take a while for large datasets)...")
+        # Determine number of worker processes
+        if num_workers is None:
+            num_workers = max(1, cpu_count() - 1)  # Leave one CPU free
+        logger.info(f"Using {num_workers} workers for parallel sequence creation...")
         
-        # Group by user to create sequences - optimized version
-        self.sequences = []
+        # Group by user to create sequences - parallel version
         user_ids = self.df['user_id'].unique()
         logger.info(f"Processing {len(user_ids)} users...")
         
-        for idx, user_id in enumerate(user_ids):
-            if idx % 100 == 0:
-                logger.info(f"  Processed {idx}/{len(user_ids)} users, {len(self.sequences)} sequences created")
-            
-            user_df = self.df[self.df['user_id'] == user_id].sort_values('day').reset_index(drop=True)
-            
-            # Create sliding windows of 24 hours
-            for i in range(len(user_df) - sequence_length):
-                # Early exit if we've reached max_sequences
+        # Prepare arguments for parallel processing
+        user_args = []
+        for user_id in user_ids:
+            user_df = self.df[self.df['user_id'] == user_id]
+            # Convert to dict for pickling (multiprocessing requirement)
+            user_data = user_df.to_dict('list')
+            user_args.append((user_id, user_data, feature_cols, latent_cols, sequence_length))
+        
+        # Process users in parallel
+        self.sequences = []
+        if num_workers > 1:
+            with Pool(processes=num_workers) as pool:
+                # Use imap_unordered for better performance with progress bar
+                results = list(tqdm(
+                    pool.imap_unordered(_process_user_sequences, user_args, chunksize=10),
+                    total=len(user_args),
+                    desc="Creating sequences",
+                    unit="user"
+                ))
+                
+                # Flatten results
+                for user_sequences in results:
+                    self.sequences.extend(user_sequences)
+                    if max_sequences and len(self.sequences) >= max_sequences:
+                        self.sequences = self.sequences[:max_sequences]
+                        break
+        else:
+            # Fallback to single-threaded if num_workers=1
+            for args in tqdm(user_args, desc="Creating sequences", unit="user"):
+                user_sequences = _process_user_sequences(args)
+                self.sequences.extend(user_sequences)
                 if max_sequences and len(self.sequences) >= max_sequences:
-                    logger.info(f"Reached max_sequences limit of {max_sequences}")
+                    self.sequences = self.sequences[:max_sequences]
                     break
-                
-                features = user_df.loc[i:i+sequence_length-1, feature_cols].values
-                latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
-                migraine_next = user_df.loc[i+sequence_length, 'migraine']
-                migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
-                
-                self.sequences.append({
-                    'features': features,
-                    'latents': latents,
-                    'migraine_next': migraine_next,
-                    'migraine_prob_next': migraine_prob_next
-                })
-            
-            if max_sequences and len(self.sequences) >= max_sequences:
-                break
         
         logger.info(f"Created {len(self.sequences)} sequences from {len(user_ids)} users")
     
@@ -170,7 +215,10 @@ def train_epoch(model, dataloader, optimizer, device, config):
     migraine_weights = torch.tensor([0.5, 0.4, 0.45, 0.35], device=device)
     migraine_bias = torch.tensor([-1.8], device=device)
     
-    for batch_idx, batch in enumerate(dataloader):
+    # Progress bar for batches
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Training", unit="batch")
+    
+    for batch_idx, batch in pbar:
         features = batch['features'].to(device)
         latents = batch['latents'].to(device)
         migraine_next = batch['migraine_next'].to(device)
@@ -213,10 +261,15 @@ def train_epoch(model, dataloader, optimizer, device, config):
         total_policy_loss += loss_policy.item()
         total_migraine_loss += loss_migraine.item()
         
-        if (batch_idx + 1) % config['logging']['log_interval'] == 0:
-            logger.info(f"  Batch {batch_idx+1}/{len(dataloader)}: "
-                       f"Loss={loss.item():.4f}, Post={loss_post.item():.4f}, "
-                       f"Policy={loss_policy.item():.4f}, Migr={loss_migraine.item():.4f}")
+        # Update progress bar
+        pbar.set_postfix({
+            'loss': f'{loss.item():.4f}',
+            'post': f'{loss_post.item():.4f}',
+            'policy': f'{loss_policy.item():.4f}',
+            'migr': f'{loss_migraine.item():.4f}'
+        })
+    
+    pbar.close()
     
     n_batches = len(dataloader)
     return {
@@ -237,8 +290,11 @@ def validate(model, dataloader, device, config):
     migraine_weights = torch.tensor([0.5, 0.4, 0.45, 0.35], device=device)
     migraine_bias = torch.tensor([-1.8], device=device)
     
+    # Progress bar for validation
+    pbar = tqdm(dataloader, desc="Validating", unit="batch", leave=False)
+    
     with torch.no_grad():
-        for batch in dataloader:
+        for batch in pbar:
             features = batch['features'].to(device)
             latents = batch['latents'].to(device)
             migraine_next = batch['migraine_next'].to(device)
@@ -261,6 +317,11 @@ def validate(model, dataloader, device, config):
             
             all_preds.extend(p_migraine.cpu().numpy())
             all_targets.extend(migraine_next.cpu().numpy())
+            
+            # Update progress bar
+            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+    
+    pbar.close()
     
     all_preds = np.array(all_preds)
     all_targets = np.array(all_targets).flatten()
@@ -373,8 +434,13 @@ def main():
     training_log = []
     
     logger.info("Starting training...")
-    for epoch in range(config['training']['num_epochs']):
-        logger.info(f"\nEpoch {epoch+1}/{config['training']['num_epochs']}")
+    logger.info("="*60)
+    
+    # Outer progress bar for epochs
+    epoch_pbar = tqdm(range(config['training']['num_epochs']), desc="Epochs", unit="epoch")
+    
+    for epoch in epoch_pbar:
+        epoch_pbar.set_description(f"Epoch {epoch+1}/{config['training']['num_epochs']}")
         
         # Train
         train_metrics = train_epoch(model, train_loader, optimizer, device, config)
@@ -398,6 +464,14 @@ def main():
             'lr': optimizer.param_groups[0]['lr']
         }
         training_log.append(log_entry)
+        
+        # Update epoch progress bar with metrics
+        epoch_pbar.set_postfix({
+            'train_loss': f'{train_metrics["loss"]:.4f}',
+            'val_loss': f'{val_metrics["loss"]:.4f}',
+            'val_auc': f'{val_metrics["auc"]:.4f}',
+            'best_val': f'{best_val_loss:.4f}'
+        })
         
         logger.info(f"Train - Loss: {train_metrics['loss']:.4f}, "
                    f"Post: {train_metrics['post_loss']:.4f}, "
@@ -440,7 +514,10 @@ def main():
         # Early stopping
         if patience_counter >= config['training']['patience']:
             logger.info(f"\nEarly stopping at epoch {epoch+1}")
+            epoch_pbar.close()
             break
+    
+    epoch_pbar.close()
     
     # Save training log
     log_df = pd.DataFrame(training_log)

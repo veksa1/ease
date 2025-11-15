@@ -8,7 +8,7 @@ data:
 
 # Limit sequences for faster testing (set to null or remove for full dataset)
 # With 2.9M rows, full dataset creates ~2.9M sequences which takes forever to load
-max_sequences_per_dataset: 10000  # Start with 10k sequences for testing
+max_sequences_per_dataset: 100000  # Start with 10k sequences for testing
   
 # Model configuration
 model:
