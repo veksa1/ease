@@ -270,20 +270,13 @@ export function HomeScreen({
             lowStimulationMode={lowStimulationMode}
           />
 
-          {/* Primary CTA - Quick Check moved to top */}
+          {/* Primary CTA - Take it easy */}
           <Button
-            onClick={onQuickCheckClick}
-            className="w-full h-12 gap-2 relative"
+            onClick={() => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage)}
+            className="w-full h-12 gap-2"
             style={{ borderRadius: '12px' }}
           >
-            <HelpCircle className="w-5 h-5" />
-            Quick check
-            {streakCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-foreground text-label border border-border">
-                <Flame className="w-3 h-3" />
-                {streakCount}
-              </span>
-            )}
+            <span className="truncate">{contextualAction.label}</span>
           </Button>
 
           {/* Secondary Actions */}
@@ -302,14 +295,21 @@ export function HomeScreen({
               }
             />
 
-            {/* Keep up the good habits - moved to secondary */}
+            {/* Quick check */}
             <Button
+              onClick={onQuickCheckClick}
               variant="outline"
-              className="h-12 gap-2"
+              className="h-12 gap-2 relative"
               style={{ borderRadius: '12px' }}
-              onClick={() => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage)}
             >
-              <span className="truncate">{contextualAction.label}</span>
+              <HelpCircle className="w-5 h-5" />
+              Quick check
+              {streakCount > 0 && (
+                <span className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-foreground text-label border border-border">
+                  <Flame className="w-3 h-3" />
+                  {streakCount}
+                </span>
+              )}
             </Button>
           </div>
 
@@ -414,21 +414,8 @@ export function HomeScreen({
                       icon={Wind}
                       title="Take a breathing break"
                       description="5 minutes of deep breathing can reduce stress and lower migraine risk."
-                      actionLabel="Start now →"
-                      onAction={() => alert('Starting breathing exercise')}
                       iconBgColor="bg-accent/10"
                       iconColor="text-accent"
-                    />
-                  </CarouselItem>
-                  <CarouselItem>
-                    <TipCard
-                      icon={Sun}
-                      title="Try dark mode"
-                      description="Reduce eye strain by switching to dark mode during the day."
-                      actionLabel="Enable →"
-                      onAction={() => alert('Enabling dark mode')}
-                      iconBgColor="bg-primary/10"
-                      iconColor="text-primary"
                     />
                   </CarouselItem>
                   <CarouselItem>
@@ -436,8 +423,6 @@ export function HomeScreen({
                       icon={Droplets}
                       title="Stay hydrated"
                       description="Drink 250ml of water now to prevent dehydration headaches."
-                      actionLabel="Log water →"
-                      onAction={() => alert('Logging water intake')}
                       iconBgColor="bg-success/10"
                       iconColor="text-success"
                     />

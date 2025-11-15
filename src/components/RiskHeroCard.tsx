@@ -133,7 +133,7 @@ export function RiskHeroCard({
       {showDetails && (
         <div className="fixed inset-0 z-50 bg-background text-foreground flex flex-col">
           <div className="flex-shrink-0 border-b border-border/60 bg-background/80 backdrop-blur">
-            <div className="mx-auto max-w-5xl h-12 md:h-14 px-2 md:px-3 flex items-center gap-3">
+            <div className="mx-auto max-w-5xl h-12 md:h-14 px-2 md:px-3 flex items-center">
               <button
                 onClick={() => setShowDetails(false)}
                 className="flex items-center justify-center w-9 h-9 rounded-full bg-muted hover:bg-muted/80 transition-colors"
@@ -141,10 +141,11 @@ export function RiskHeroCard({
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="flex items-baseline gap-3">
+              <div className="flex-1 flex flex-col items-center">
                 <h2 className="text-base md:text-lg font-semibold">Your risk factors</h2>
                 <span className="text-xs md:text-sm text-muted-foreground">All current factors and their influence</span>
               </div>
+              <div className="w-9"></div>
             </div>
           </div>
 
