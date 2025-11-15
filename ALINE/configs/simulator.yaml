@@ -1,52 +1,44 @@
 # ALINE Migraine Simulator Configuration
 # Ticket 004 - Bayesian / Markov Simulator for Synthetic Migraine Episodes
+# === Same as before, only showing changed parts ===
 
 # Dataset parameters
-n_users: 10000  # Number of synthetic users (reduced for faster testing)
-horizon: 365  # Days to simulate per user
-train_split: 0.8  # Train/val split ratio
+n_users: 10000
+horizon: 365
+train_split: 0.8
 random_seed: 42
 
-# Latent state dimensions: [stress, sleepDebt, hormonal, envLoad]
 latent_dim: 4
 
-# State transition matrix (A): Z_{t+1} = A @ Z_t + B @ u_t + noise
-# Controls temporal dynamics and autoregressive behavior
-state_transition_matrix:  # 4x4 matrix
-  - [0.7, 0.1, 0.05, 0.05]   # stress persistence + cross-effects
-  - [0.15, 0.65, 0.05, 0.1]  # sleepDebt persistence
-  - [0.05, 0.05, 0.8, 0.05]  # hormonal persistence
-  - [0.1, 0.05, 0.05, 0.75]  # environmental load persistence
+# Make episodes more persistent + a bit stronger coupling
+state_transition_matrix:
+  - [0.85, 0.15, 0.05, 0.05]   # stress: more persistence, sleep feeds into stress
+  - [0.10, 0.80, 0.05, 0.10]   # sleepDebt: stronger persistence
+  - [0.05, 0.05, 0.90, 0.05]   # hormonal: high persistence (quasi-trend / cycle)
+  - [0.10, 0.05, 0.05, 0.85]   # envLoad: more persistence
 
-# Input matrix (B): maps observable features to latent state changes
-# Shape: 4 x n_features (4 x 21)
-input_matrix:  # categorical mappings
-  stress_features: [0, 3, 4, 5]  # feature indices that affect stress
-  sleep_features: [0, 1, 2]  # feature indices that affect sleepDebt
-  hormonal_features: [15, 16]  # feature indices that affect hormonal
-  env_features: [12, 13, 14]  # feature indices that affect envLoad
-  
-# Feature weights for input matrix (reduced to prevent accumulation)
+# Stronger feature → latent influence
 input_weights:
-  stress: 0.01
-  sleep: 0.01
-  hormonal: 0.008
-  environmental: 0.005
+  stress: 0.05        # was 0.01
+  sleep: 0.06         # was 0.01
+  hormonal: 0.04      # was 0.008
+  environmental: 0.03 # was 0.005
 
-# Process noise (η_t ~ N(0, Σ))
+# Keep noise similar so we still get variability but not pure noise
 process_noise:
   stress: 0.15
   sleepDebt: 0.12
   hormonal: 0.10
   envLoad: 0.08
 
-# Migraine probability logistic model: p = 1/(1+exp(-(w@Z+b)))
+# Make latents matter much more for migraine risk
 migraine_model:
-  weights: [0.5, 0.4, 0.45, 0.35]  # [stress, sleepDebt, hormonal, envLoad]
-  bias: -1.8  # Adjusted to achieve ~15% baseline migraine rate
-  
-# Baseline migraine rate (empirical)
-baseline_migraine_rate: 0.15  # ~15% of days have migraines
+  # Stronger weights so that high-stress / high-debt / hormonal peaks really stand out
+  weights: [1.6, 1.4, 1.8, 0.9]   # [stress, sleepDebt, hormonal, envLoad]
+  # Start with a slightly more negative bias to avoid migraine rate exploding
+  bias: -2.4                        # adjust after looking at resulting baseline
+
+baseline_migraine_rate: 0.15  # target, not enforced
 
 # Data paths
 paths:

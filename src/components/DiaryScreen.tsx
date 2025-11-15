@@ -19,6 +19,7 @@ import { PillChip } from './PillChip';
 import { DayDetailsScreen } from './DayDetailsScreen';
 import { BottomNav } from './BottomNav';
 import { useCalendar } from '../hooks/useDemoData';
+import { CalendarEventsDisplay } from './CalendarEventsDisplay';
 
 // Mock data types
 type RiskLevel = 'low' | 'medium' | 'high' | null;
@@ -433,6 +434,15 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                     </div>
                   </div>
                 )}
+
+                {/* Calendar Events */}
+                <div className="mb-6">
+                  <CalendarEventsDisplay
+                    userId="demo-user"
+                    date={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay)}
+                    compact={true}
+                  />
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">

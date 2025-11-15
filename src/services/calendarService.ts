@@ -43,6 +43,17 @@ export interface ContextGenerationResponse {
   timestamp: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  attendees?: number;
+  isAllDay?: boolean;
+}
+
 class CalendarService {
   /**
    * Save calendar connection for a user
@@ -106,6 +117,103 @@ class CalendarService {
     }
 
     return response.data!;
+  }
+
+  /**
+   * Get calendar events for a specific date
+   * 
+   * Note: This is a mock implementation until the backend endpoint is ready.
+   * Once the backend provides a /user/calendar/{userId}/events endpoint,
+   * this can be updated to fetch real calendar events.
+   */
+  async getCalendarEvents(
+    userId: string,
+    date: Date
+  ): Promise<CalendarEvent[]> {
+    // TODO: Replace with actual API call when backend endpoint is available
+    // const dateStr = date.toISOString().split('T')[0];
+    // const response = await apiClient.get<{ events: CalendarEvent[] }>(
+    //   `/user/calendar/${userId}/events?date=${dateStr}`
+    // );
+    // return response.data?.events || [];
+
+    // Mock implementation for now
+    return this.generateMockEvents(date);
+  }
+
+  /**
+   * Generate mock calendar events for demo purposes
+   * This will be removed once real calendar API is available
+   */
+  private generateMockEvents(date: Date): CalendarEvent[] {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayOfWeek = date.getDay();
+    
+    // Weekend events
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return [
+        {
+          id: `${dateStr}-1`,
+          title: 'Morning Yoga',
+          start: `${dateStr}T08:00:00`,
+          end: `${dateStr}T09:00:00`,
+          location: 'Home',
+        },
+        {
+          id: `${dateStr}-2`,
+          title: 'Family Brunch',
+          start: `${dateStr}T11:00:00`,
+          end: `${dateStr}T13:00:00`,
+          location: 'Cafe Downtown',
+          attendees: 4,
+        },
+      ];
+    }
+    
+    // Weekday events
+    const events: CalendarEvent[] = [
+      {
+        id: `${dateStr}-1`,
+        title: 'Team Standup',
+        start: `${dateStr}T09:00:00`,
+        end: `${dateStr}T09:30:00`,
+        location: 'Zoom',
+        attendees: 8,
+      },
+      {
+        id: `${dateStr}-2`,
+        title: 'Project Planning',
+        start: `${dateStr}T10:00:00`,
+        end: `${dateStr}T11:30:00`,
+        location: 'Conference Room B',
+        attendees: 5,
+      },
+    ];
+
+    // Add afternoon event on some days
+    if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) {
+      events.push({
+        id: `${dateStr}-3`,
+        title: 'Client Meeting',
+        start: `${dateStr}T14:00:00`,
+        end: `${dateStr}T15:00:00`,
+        location: 'Zoom',
+        attendees: 3,
+      });
+    }
+
+    // Add gym on specific days
+    if (dayOfWeek === 2 || dayOfWeek === 4) {
+      events.push({
+        id: `${dateStr}-4`,
+        title: 'Gym Workout',
+        start: `${dateStr}T18:00:00`,
+        end: `${dateStr}T19:00:00`,
+        location: 'Fitness Center',
+      });
+    }
+
+    return events;
   }
 
   /**
