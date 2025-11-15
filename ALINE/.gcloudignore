@@ -1,0 +1,75 @@
+# .gcloudignore for Google Cloud Build
+# Similar to .dockerignore but for gcloud builds
+
+# Git
+.git
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation (except README)
+*.md
+!README.md
+
+# Tests
+tests/
+*.pytest_cache/
+.coverage
+
+# Development files
+notebooks/
+examples/
+scripts/train_*.py
+scripts/eval.py
+scripts/test_*.py
+scripts/generate_*.py
+scripts/simulator.py
+
+# Data artifacts
+data/*.csv
+data/*.json
+data/*.pkl
+artifacts/
+reports/
+runs/
+!runs/checkpoints/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker files (use Dockerfile.service instead)
+Dockerfile
+!Dockerfile.service
+docker-compose.yml
+.dockerignore
+
+# Visualization
+viz/
+
+# Tickets
+tickets/
+
+# Large files
+*.tar.gz
+*.zip
+*.rar
