@@ -232,3 +232,170 @@ docker-compose logs -f frontend
 
 **Need help?** Check the `DEPLOYMENT.md` file for detailed server setup and deployment instructions.
   
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+Visit `http://localhost:3000`
+
+## Building
+
+```bash
+npm run build
+npm run preview
+```
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push to GitHub
+2. Import project in [Vercel](https://vercel.com)
+3. Framework: Vite
+4. Build command: `npm run build`
+5. Output directory: `build`
+6. Deploy!
+
+Environment variables:
+- `VITE_DEMO_MODE=true`
+- `VITE_ENVIRONMENT=production`
+
+### Manual Deployment
+
+```bash
+npm run build
+# Upload build/ directory to your hosting service
+```
+
+## Demo Data
+
+Demo data is pre-generated using the ALINE ML model:
+
+```bash
+cd ALINE
+python scripts/create_demo_dataset.py
+```
+
+This generates `src/data/demoUserAlex.json` (131 KB) with:
+- 30 days × 24 hours = 720 hourly predictions
+- 6 migraine events with realistic triggers
+- 4 correlation insights
+- Calendar data
+
+## Architecture
+
+```
+src/
+├── components/        # React components
+│   ├── HomeScreenContainer.tsx  # Live risk display
+│   ├── DiaryScreen.tsx          # Calendar with predictions
+│   ├── InsightsScreen.tsx       # Correlations & experiments
+│   └── QuickCheckFlow.tsx       # User input flow
+├── hooks/            # React hooks
+│   └── useDemoData.ts          # Data access hooks
+├── services/         # Business logic
+│   ├── demoDataService.ts      # Data singleton
+│   └── featureConverter.ts     # QuickCheck → risk
+├── types/            # TypeScript types
+│   └── aline.ts               # Demo data types
+└── data/             # Static data
+    └── demoUserAlex.json      # Pre-computed predictions
+```
+
+## Features
+
+### Real-Time Risk Prediction
+
+- Risk percentage updates from demo data
+- QuickCheck adjusts risk based on caffeine, water, food
+- Confidence bounds (5th-95th percentile)
+- Loading states with smooth animations
+
+### Interactive Calendar
+
+- 30 days of predictions visualized
+- Color-coded risk levels (low/medium/high)
+- Migraine events marked
+- Filter by predictions, attacks, triggers
+- Month navigation (October-November 2025)
+
+### Insights & Correlations
+
+- 4 correlation insights from ML analysis
+- Experiment tracking with localStorage
+- Pattern chip showing top triggers
+- Narrative insights generation
+
+### Persistence
+
+All user actions persist to localStorage:
+- `ease_streak_count` - QuickCheck streak
+- `ease_user_timeline` - Check-ins and reports
+- `ease_experiment_hydration` - Experiment progress
+- `ease_has_seen_onboarding` - Onboarding skip
+
+## Reset Demo
+
+Click the reset button (bottom-right) to clear all localStorage and restart.
+
+## License
+
+Proprietary - EASE Team 2025
+
+---
+
+## 🚀 EASE Demo - Tickets 013-018
+
+### Demo User "Alex"
+- **Period**: October 16 - November 14, 2025 (30 days)
+- **Migraine events**: 6 realistic attacks with triggers
+- **Average risk**: 15.1%
+- **Data file**: `src/data/demoUserAlex.json` (131 KB)
+
+### Features Implemented
+
+✅ **Live Risk Predictions** - HomeScreen shows real-time risk from ALINE ML model  
+✅ **Interactive QuickCheck** - Updates risk based on caffeine, water, food inputs  
+✅ **Calendar Integration** - DiaryScreen displays 30 days with color-coded risk  
+✅ **Insights & Correlations** - Real correlation data from ML analysis  
+✅ **localStorage Persistence** - Streak, timeline, experiments saved locally  
+✅ **Demo Reset** - Button to clear all data and restart  
+✅ **Optimized Build** - Code splitting: React (142KB) + Radix (50KB) + App (344KB)
+
+### Deployment to Vercel
+
+```bash
+# 1. Install Vercel CLI
+npm i -g vercel
+
+# 2. Deploy
+vercel --prod
+```
+
+Or use GitHub integration:
+1. Push to GitHub
+2. Import in Vercel dashboard
+3. Framework: Vite
+4. Build: `npm run build`
+5. Output: `build`
+
+### Environment Variables
+
+Set in Vercel dashboard or `.env.production`:
+- `VITE_DEMO_MODE=true`
+- `VITE_ENVIRONMENT=production`
+
+### Regenerate Demo Data
+
+```bash
+cd ALINE
+python scripts/create_demo_dataset.py
+```
+
+Outputs: `src/data/demoUserAlex.json`
+
+---
+

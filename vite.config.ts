@@ -50,8 +50,31 @@
       },
     },
     build: {
-      target: 'esnext',
-      outDir: 'dist',
+      target: 'es2020',
+      outDir: 'build',
+      // Code splitting for better performance
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-radix': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-slider',
+              '@radix-ui/react-switch',
+              '@radix-ui/react-label',
+            ],
+          },
+        },
+      },
+      // Use esbuild for minification (faster and built-in)
+      minify: 'esbuild',
+      // Chunk size warning limit
+      chunkSizeWarningLimit: 1000,
+    },
+    // Optimize dependencies
+    optimizeDeps: {
+      include: ['react', 'react-dom'],
     },
     server: {
       port: 3000,

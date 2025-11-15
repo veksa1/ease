@@ -8,6 +8,7 @@ import { DataSourceCard } from './components/DataSourceCard';
 import { ConsentItem } from './components/ConsentItem';
 import { DeviceCard } from './components/DeviceCard';
 import { HomeScreen } from './components/HomeScreen';
+import { HomeScreenContainer } from './components/HomeScreenContainer';
 import { BottomNav } from './components/BottomNav';
 import { QuickCheckFlow } from './components/QuickCheckFlow';
 import { DiaryScreen } from './components/DiaryScreen';
@@ -15,12 +16,33 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { InsightsScreen } from './components/InsightsScreen';
 import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
+import { useRiskPrediction } from './hooks/useDemoData';
+import { DemoResetButton } from './components/DemoResetButton';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<string>('onboarding-1');
+  
+  // Check if user has seen onboarding
+  const [hasSeenOnboarding] = useState(() => {
+    return localStorage.getItem('ease_has_seen_onboarding') === 'true';
+  });
+  
+  const [currentScreen, setCurrentScreen] = useState<string>(() => {
+    // Skip onboarding if already seen
+    if (hasSeenOnboarding) return 'home';
+    return 'onboarding-1';
+  });
+  
   const [onboardingStep, setOnboardingStep] = useState(1);
-  const [streakCount, setStreakCount] = useState(7);
+  
+  // Get risk prediction hook to update risk
+  const { updateRiskWithQuickCheck } = useRiskPrediction();
+  
+  // Get streak count from localStorage
+  const [streakCount, setStreakCount] = useState(() => {
+    const stored = localStorage.getItem('ease_streak_count');
+    return stored ? parseInt(stored, 10) : 7;
+  });
   
   // Consent state
   const [consents, setConsents] = useState({
@@ -67,10 +89,17 @@ export default function App() {
     }
   };
 
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('ease_has_seen_onboarding', 'true');
+    setCurrentScreen('home');
+  };
+
   const handleOnboardingSkip = () => {
     if (onboardingStep < 3) {
       setOnboardingStep(3);
       setCurrentScreen('onboarding-3');
+    } else {
+      handleOnboardingComplete();
     }
   };
 
@@ -466,7 +495,7 @@ export default function App() {
 
             <div className="pt-2 space-y-3">
               <Button
-                onClick={() => setCurrentScreen('home')}
+                onClick={handleOnboardingComplete}
                 disabled={!hasConnectedDevice()}
                 className="w-full h-12"
                 style={{ borderRadius: '12px' }}
@@ -475,7 +504,7 @@ export default function App() {
               </Button>
               <div className="text-center">
                 <button
-                  onClick={() => setCurrentScreen('home')}
+                  onClick={handleOnboardingComplete}
                   className="text-label text-muted-foreground hover:text-foreground transition-colors underline p-2"
                   style={{ minHeight: '44px' }}
                 >
@@ -490,8 +519,16 @@ export default function App() {
       {/* Main App Screens */}
       {currentScreen.startsWith('quick-check') && (
         <QuickCheckFlow
-          onComplete={() => {
-            setStreakCount(prev => prev + 1);
+          onComplete={(data) => {
+            // Update risk with QuickCheck data
+            updateRiskWithQuickCheck(data);
+            
+            // Increment and save streak
+            const newStreak = streakCount + 1;
+            setStreakCount(newStreak);
+            localStorage.setItem('ease_streak_count', newStreak.toString());
+            
+            // Return to home
             setCurrentScreen('home');
           }}
           onBack={() => setCurrentScreen('home')}
@@ -528,24 +565,7 @@ export default function App() {
 
       {currentScreen === 'home' && (
         <>
-          <HomeScreen
-            userName="Alex"
-            riskLevel="low"
-            riskPercentage={18}
-            contextualAction={{ icon: Coffee, label: 'Avoid headache' }}
-            streakCount={streakCount}
-            todayData={{
-              sleepDuration: '7h 32m',
-              hrvTrend: 'up',
-              hrvChange: '+8%',
-              screenTime: '2h 15m',
-            }}
-            riskContributors={[
-              { label: 'Good sleep', percentage: 40, icon: Moon },
-              { label: 'Normal HRV', percentage: 35, icon: Activity },
-              { label: 'Low stress', percentage: 25, icon: Heart },
-            ]}
-            whatHelps={['Stay active', 'Maintain routine', 'Monitor triggers']}
+          <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
             onSootheModeClick={() => setCurrentScreen('soothe-mode')}
@@ -560,24 +580,7 @@ export default function App() {
 
       {currentScreen === 'home-low-stimulation' && (
         <>
-          <HomeScreen
-            userName="Alex"
-            riskLevel="low"
-            riskPercentage={18}
-            contextualAction={{ icon: Coffee, label: 'Avoid headache' }}
-            streakCount={streakCount}
-            todayData={{
-              sleepDuration: '7h 32m',
-              hrvTrend: 'up',
-              hrvChange: '+8%',
-              screenTime: '2h 15m',
-            }}
-            riskContributors={[
-              { label: 'Good sleep', percentage: 40, icon: Moon },
-              { label: 'Normal HRV', percentage: 35, icon: Activity },
-              { label: 'Low stress', percentage: 25, icon: Heart },
-            ]}
-            whatHelps={['Stay active', 'Maintain routine', 'Monitor triggers']}
+          <HomeScreenContainer
             onQuickCheckClick={() => setCurrentScreen('quick-check')}
             onInsightsClick={() => setCurrentScreen('insights')}
             onSootheModeClick={() => setCurrentScreen('soothe-mode')}
@@ -589,6 +592,9 @@ export default function App() {
           />
         </>
       )}
+      
+      {/* Demo Reset Button */}
+      <DemoResetButton />
     </div>
   );
 }
