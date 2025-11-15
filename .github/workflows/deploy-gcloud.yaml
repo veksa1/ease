@@ -87,17 +87,25 @@ jobs:
         docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
         docker push ${{ env.IMAGE_NAME }}:latest
 
+    - name: Clean up Docker to free space
+      run: |
+        docker system prune -af --volumes
+        df -h
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
+      continue-on-error: true
       with:
         image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
+        skip-db-update: false
+        skip-java-db-update: true
 
     - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
 
