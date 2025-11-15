@@ -20,26 +20,63 @@ import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
 import { RiskVariable } from './types';
 import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDetailsStep';
+import { DevSkipButton } from './components/DevSkipButton';
 import type { PersonalMigraineProfile } from './types';
+
+declare const __APP_ENV__: string; // or rely on existing env typing if present
+const isDev = (import.meta as any).env?.MODE === 'development' || __APP_ENV__ === 'development';
+
+export type CurrentScreen =
+  | 'onboarding-1'
+  | 'onboarding-2'
+  | 'onboarding-3'
+  | 'onboarding-4'
+  | 'connect-devices'
+  | 'home'
+  | 'home-low-stimulation'
+  | 'diary'
+  | 'profile'
+  | 'insights'
+  | 'soothe-mode'
+  | 'quick-check'
+  | 'share-with-clinician';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
   const [sootheModeData, setSootheModeData] = useState<{ riskVariables: RiskVariable[], riskPercentage: number } | null>(null);
   
   // Check if user has seen onboarding
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<CurrentScreen>('onboarding-1');
   
   useEffect(() => {
-    sqliteService.getSetting('has_seen_onboarding').then(value => {
-      setHasSeenOnboarding(value === 'true');
-    });
+    let isMounted = true;
+    (async () => {
+      try {
+        const seen = await sqliteService.getSetting('has_seen_onboarding');
+        if (!isMounted) return;
+        const hasSeen = seen === 'true';
+        setHasSeenOnboarding(hasSeen);
+
+        // In production: if user has already completed onboarding, jump straight to home.
+        // In development: always start at onboarding-1 so Dev Skip is visible.
+        if (!isDev && hasSeen) {
+          setCurrentScreen('home');
+        } else {
+          setCurrentScreen('onboarding-1');
+        }
+      } catch (e) {
+        console.error('Failed to load onboarding setting', e);
+        if (isMounted) {
+          setHasSeenOnboarding(false);
+          setCurrentScreen('onboarding-1');
+        }
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
-  
-  const [currentScreen, setCurrentScreen] = useState<string>(() => {
-    // Skip onboarding if already seen
-    if (hasSeenOnboarding) return 'home';
-    return 'onboarding-1';
-  });
   
   const [onboardingStep, setOnboardingStep] = useState(1);
   
@@ -104,8 +141,9 @@ export default function App() {
     }
   };
 
-  const handleOnboardingComplete = () => {
-    sqliteService.setSetting('has_seen_onboarding', 'true');
+  const handleOnboardingComplete = async () => {
+    await sqliteService.setSetting('has_seen_onboarding', 'true');
+    setHasSeenOnboarding(true);
     setCurrentScreen('home');
   };
 
@@ -608,6 +646,9 @@ export default function App() {
           />
         </>
       )}
+      
+      {/* Developer Skip Button - Only visible in development */}
+      {isOnboarding && isDev && <DevSkipButton onComplete={handleOnboardingComplete} />}
     </div>
   );
 }
