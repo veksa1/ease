@@ -1,0 +1,40 @@
+# ALINE Active Query Policy Configuration - Ticket 007
+# Configuration for selecting top-k hourly slots for targeted sensing
+
+# Priority score weights
+# score_t = λ1 * entropy(p_t) + λ2 * mean(sigma_z_t) + λ3 * |∂p/∂Z_t|
+
+weights:
+  lambda1: 1.0  # Weight for entropy term (uncertainty in prediction)
+  lambda2: 0.5  # Weight for posterior uncertainty term
+  lambda3: 0.3  # Weight for gradient/impact term
+
+# Number of hours to select for querying
+k: 3  # Select top 3 hours per day
+
+# Migraine prediction model parameters (from simulator)
+migraine_model:
+  weights: [0.5, 0.4, 0.45, 0.35]  # [stress, sleepDebt, hormonal, envLoad]
+  bias: -1.8
+
+# Baseline policies for comparison
+baselines:
+  random:
+    enabled: true
+    description: "Random hour selection"
+  
+  fixed:
+    enabled: true
+    hours: [8, 12, 20]  # 8am, 12pm, 8pm
+    description: "Fixed schedule (morning, noon, evening)"
+  
+  no_policy:
+    enabled: true
+    description: "Use all hours equally (no active querying)"
+
+# Evaluation settings
+evaluation:
+  metrics:
+    - precision_at_k
+    - uncertainty_reduction
+    - coverage
