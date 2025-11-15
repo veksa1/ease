@@ -58,7 +58,7 @@ class RiskPredictionService {
    * 
    * @returns Mock 24-hour feature array
    */
-  generateMockFeatures(numFeatures: number = 10): number[][] {
+  generateMockFeatures(numFeatures: number = 20): number[][] {
     const hours = 24;
     const features: number[][] = [];
     
@@ -83,7 +83,7 @@ class RiskPredictionService {
   async checkHealth(): Promise<boolean> {
     try {
       const response = await apiClient.get<{ status: string }>('/health');
-      return response.data?.status === 'healthy';
+      return response.data?.status === 'healthy' || response.data?.status === 'ok';
     } catch (error) {
       console.error('Backend health check failed:', error);
       return false;

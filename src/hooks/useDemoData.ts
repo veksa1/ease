@@ -7,8 +7,9 @@
 
 import { useState, useEffect } from 'react';
 import { demoDataService } from '../services/demoDataService';
-import { quickCheckToRiskAdjustment, type QuickCheckData } from '../services/featureConverter';
+import { quickCheckToRiskAdjustment, quickCheckToFeatures, type QuickCheckData } from '../services/featureConverter';
 import { riskPredictionService } from '../services/riskPredictionService';
+import { posteriorService, type HourlyPosterior } from '../services/posteriorService';
 import type { Correlation, CalendarDay, HourlyRisk, UserTimelineEntry } from '../types/aline';
 
 /**
@@ -17,13 +18,14 @@ import type { Correlation, CalendarDay, HourlyRisk, UserTimelineEntry } from '..
  * 
  * Usage:
  * ```tsx
- * const { loading, risk, bounds, updateRiskWithQuickCheck } = useRiskPrediction();
+ * const { loading, risk, bounds, isBackendConnected, updateRiskWithQuickCheck } = useRiskPrediction();
  * ```
  */
 export function useRiskPrediction() {
   const [loading, setLoading] = useState(true);
   const [risk, setRisk] = useState<number>(0);
   const [bounds, setBounds] = useState({ lower: 0, upper: 0 });
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [useBackend, setUseBackend] = useState(true);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function useRiskPrediction() {
         
         // TODO: Replace with actual user feature data
         // For now, using mock features for demonstration
-        const features = riskPredictionService.generateMockFeatures(10);
+        const features = riskPredictionService.generateMockFeatures(20);
         
         const prediction = await riskPredictionService.getDailyRisk(userId, features);
         
@@ -49,6 +51,7 @@ export function useRiskPrediction() {
             lower: prediction.lower_bound,
             upper: prediction.upper_bound,
           });
+          setIsBackendConnected(true);
           setLoading(false);
           return;
         }
@@ -56,6 +59,7 @@ export function useRiskPrediction() {
       
       // Fallback to demo data if backend unavailable
       console.log('Using demo data (backend unavailable or disabled)');
+      setIsBackendConnected(false);
       const { risk: r, lower, upper } = demoDataService.getCurrentRisk();
       setRisk(r);
       setBounds({ lower, upper });
@@ -67,8 +71,9 @@ export function useRiskPrediction() {
 
   /**
    * Update risk based on QuickCheck responses
+   * Also fetches hourly posterior if backend is available
    */
-  const updateRiskWithQuickCheck = (checkData: QuickCheckData) => {
+  const updateRiskWithQuickCheck = async (checkData: QuickCheckData) => {
     const adjustment = quickCheckToRiskAdjustment(checkData);
     const newRisk = Math.max(0, Math.min(1, risk + adjustment));
     
@@ -80,9 +85,40 @@ export function useRiskPrediction() {
       'quick_check',
       checkData
     );
+    
+    // If backend is connected, fetch hourly posterior
+    if (isBackendConnected) {
+      try {
+        const features = quickCheckToFeatures(checkData, 20);
+        const userId = 'demo-user';
+        
+        const posteriorData = await posteriorService.getHourlyPosterior(userId, features);
+        
+        if (posteriorData) {
+          console.log('✅ Fetched hourly posterior from Quick Check data');
+          console.log(`   Found ${posteriorData.hourly_posteriors.length} hourly predictions`);
+          
+          // Calculate high-risk hours
+          const highRiskHours = posteriorService.getHighRiskHours(posteriorData.hourly_posteriors, 3);
+          console.log(`   High risk hours: ${highRiskHours.join(', ')}`);
+          
+          // Store in timeline for later retrieval
+          demoDataService.addTimelineEntry(
+            new Date().toISOString(),
+            'hourly_posterior',
+            {
+              posteriors: posteriorData.hourly_posteriors,
+              highRiskHours,
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Failed to fetch hourly posterior:', error);
+      }
+    }
   };
 
-  return { loading, risk, bounds, updateRiskWithQuickCheck };
+  return { loading, risk, bounds, isBackendConnected, updateRiskWithQuickCheck };
 }
 
 /**

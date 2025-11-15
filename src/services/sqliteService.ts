@@ -36,6 +36,8 @@ class SQLiteService {
         
         if (savedDb) {
           this.db = new SQL.Database(savedDb);
+          // Ensure schema exists (for migrations/updates)
+          await this.createSchema();
         } else {
           // Create new database
           this.db = new SQL.Database();

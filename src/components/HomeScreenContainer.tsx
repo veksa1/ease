@@ -26,7 +26,7 @@ export function HomeScreenContainer({
   lowStimulationMode = false,
 }: HomeScreenContainerProps) {
   // Get live risk prediction
-  const { loading, risk, bounds } = useRiskPrediction();
+  const { loading, risk, bounds, isBackendConnected } = useRiskPrediction();
   
   // Get today's metrics
   const metrics = useTodayMetrics();
@@ -47,6 +47,11 @@ export function HomeScreenContainer({
   const riskLevel: 'low' | 'moderate' | 'high' = 
     riskPercentage < 30 ? 'low' : 
     riskPercentage < 60 ? 'moderate' : 'high';
+
+  // Calculate confidence from bounds (narrower interval = higher confidence)
+  // Confidence is inversely related to the width of the interval
+  const intervalWidth = bounds.upper - bounds.lower;
+  const confidence = Math.round(Math.max(0, Math.min(100, 100 - (intervalWidth * 100))));
 
   // Contextual action based on risk
   const contextualAction = {
@@ -90,6 +95,7 @@ export function HomeScreenContainer({
       userName="Sarah"
       riskLevel={riskLevel}
       riskPercentage={riskPercentage}
+      confidence={confidence}
       contextualAction={contextualAction}
       streakCount={streakCount}
       todayData={todayData}
