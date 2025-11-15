@@ -159,6 +159,8 @@ async def lifespan(app: FastAPI):
     
     # Shutdown (cleanup if needed)
     logger.info("Shutting down ALINE service")
+    await weather_service.close()
+    logger.info("✓ Weather service closed")
 
 
 # Initialize FastAPI app with lifespan
@@ -492,6 +494,125 @@ async def generate_context(request: ContextGenerationRequest):
     except Exception as e:
         logger.error(f"Error generating context: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Weather Endpoints (Ticket 023)
+# ============================================================================
+
+from service.weather import weather_service
+from pydantic import BaseModel, Field
+
+
+class WeatherResponse(BaseModel):
+    """Current weather conditions response"""
+    pressure: float = Field(..., description="Barometric pressure in hPa")
+    temperature: float = Field(..., description="Temperature in °C")
+    humidity: float = Field(..., description="Humidity in %")
+    aqi: float = Field(..., description="Air Quality Index")
+    location: dict = Field(..., description="Location coordinates")
+
+
+class PressureChangeResponse(BaseModel):
+    """Barometric pressure change response"""
+    pressure_change: float = Field(..., description="Pressure change in hPa")
+    trend: str = Field(..., description="Trend: rising/falling/stable")
+    significance: str = Field(..., description="Significance: low/moderate/high")
+
+
+class ForecastResponse(BaseModel):
+    """Weather forecast response"""
+    forecast: List[dict] = Field(..., description="Hourly forecast data")
+
+
+@app.get("/weather/current", response_model=WeatherResponse)
+async def get_current_weather(lat: float, lon: float):
+    """
+    Get current weather conditions for location.
+    
+    Args:
+        lat: Latitude (-90 to 90)
+        lon: Longitude (-180 to 180)
+    
+    Returns:
+        Current weather data including pressure, temperature, humidity, and AQI
+    
+    Example:
+        GET /weather/current?lat=40.7128&lon=-74.0060
+    """
+    try:
+        weather = await weather_service.get_current_weather(lat, lon)
+        return WeatherResponse(
+            **weather,
+            location={"lat": lat, "lon": lon}
+        )
+    except Exception as e:
+        logger.error(f"Error fetching current weather: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch weather: {str(e)}")
+
+
+@app.get("/weather/pressure_change", response_model=PressureChangeResponse)
+async def get_pressure_change(lat: float, lon: float, hours_ago: int = 3):
+    """
+    Get barometric pressure change over last N hours.
+    
+    Args:
+        lat: Latitude
+        lon: Longitude
+        hours_ago: Number of hours to look back (default: 3)
+    
+    Returns:
+        Pressure change data with trend and significance
+    
+    Example:
+        GET /weather/pressure_change?lat=40.7128&lon=-74.0060&hours_ago=3
+    """
+    try:
+        delta = await weather_service.get_pressure_change(lat, lon, hours_ago)
+        
+        # Classify trend and significance
+        if abs(delta) < 1:
+            trend, significance = "stable", "low"
+        elif abs(delta) < 3:
+            trend = "rising" if delta > 0 else "falling"
+            significance = "moderate"
+        else:
+            trend = "rising" if delta > 0 else "falling"
+            significance = "high"
+        
+        return PressureChangeResponse(
+            pressure_change=delta,
+            trend=trend,
+            significance=significance
+        )
+    except Exception as e:
+        logger.error(f"Error fetching pressure change: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pressure change: {str(e)}")
+
+
+@app.get("/weather/forecast", response_model=ForecastResponse)
+async def get_weather_forecast(lat: float, lon: float, hours: int = 24):
+    """
+    Get hourly weather forecast.
+    
+    Args:
+        lat: Latitude
+        lon: Longitude
+        hours: Number of hours to forecast (default: 24, max: 48)
+    
+    Returns:
+        Hourly forecast data
+    
+    Example:
+        GET /weather/forecast?lat=40.7128&lon=-74.0060&hours=24
+    """
+    try:
+        hours = min(hours, 48)  # Cap at 48 hours
+        forecast = await weather_service.get_forecast(lat, lon, hours)
+        return ForecastResponse(forecast=forecast)
+    except Exception as e:
+        logger.error(f"Error fetching forecast: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch forecast: {str(e)}")
 
 
 if __name__ == "__main__":
