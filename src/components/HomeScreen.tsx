@@ -47,6 +47,7 @@ interface HomeScreenProps {
   userName: string;
   riskLevel: 'low' | 'moderate' | 'high';
   riskPercentage: number;
+  confidence?: number; // Confidence in the prediction (0-100)
   contextualAction: {
     icon: React.ElementType;
     label: string;
@@ -73,6 +74,7 @@ export function HomeScreen({
   userName,
   riskLevel,
   riskPercentage,
+  confidence = 85,
   contextualAction,
   streakCount,
   todayData,

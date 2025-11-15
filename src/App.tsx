@@ -519,9 +519,9 @@ export default function App() {
       {/* Main App Screens */}
       {currentScreen.startsWith('quick-check') && (
         <QuickCheckFlow
-          onComplete={(data) => {
-            // Update risk with QuickCheck data
-            updateRiskWithQuickCheck(data);
+          onComplete={async (data) => {
+            // Update risk with QuickCheck data and fetch hourly posterior
+            await updateRiskWithQuickCheck(data);
             
             // Increment and save streak
             const newStreak = streakCount + 1;

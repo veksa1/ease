@@ -88,65 +88,43 @@ ALINE/
 
 ## 🔧 API Endpoints
 
-### Health Check
+The ALINE service provides a REST API for migraine prediction and active querying.
+
+### Quick Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check and model status |
+| `/risk/daily` | POST | Daily migraine risk prediction |
+| `/posterior/hourly` | POST | Hourly latent state distributions |
+| `/policy/topk` | POST | Top-K hour recommendations |
+| `/user/calendar` | POST/GET/DELETE | Calendar integration |
+| `/aline/generate-context` | POST | Context generation from calendar |
+
+### Example Request
+
 ```bash
-GET /health
+curl -X POST http://localhost:8000/risk/daily \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_001",
+    "features": [[...], ...]  
+  }'
 ```
 
-### Daily Risk Prediction
-```bash
-POST /risk/daily
-Content-Type: application/json
+**⚠️ CRITICAL:** Features must be `[24 hours, 20 features]` - exactly **20 normalized features per hour**.
 
-{
-  "user_id": "user_001",
-  "features": [[...], ...]  # 24 hours × 20 features
-}
-```
+### Complete API Documentation
 
-Returns:
-```json
-{
-  "user_id": "user_001",
-  "mean_probability": 0.145,
-  "lower_bound": 0.089,
-  "upper_bound": 0.203,
-  "timestamp": "2025-11-15T02:30:00"
-}
-```
+See **[API_REFERENCE.md](./docs/API_REFERENCE.md)** for:
+- Detailed endpoint specifications
+- Complete list of 20 required features
+- Feature normalization guide
+- Calendar integration workflows
+- Error handling and troubleshooting
+- Code examples (Python, JavaScript, cURL, PowerShell)
 
-### Policy Recommendations (Top-K Hours)
-```bash
-POST /policy/topk
-Content-Type: application/json
-
-{
-  "user_id": "user_001",
-  "features": [[...], ...],
-  "k": 3
-}
-```
-
-Returns:
-```json
-{
-  "user_id": "user_001",
-  "selected_hours": [
-    {"hour": 8, "priority_score": 1.234},
-    {"hour": 12, "priority_score": 1.189},
-    {"hour": 20, "priority_score": 1.142}
-  ],
-  "k": 3,
-  "timestamp": "2025-11-15T02:30:00"
-}
-```
-
-### Hourly Posterior
-```bash
-POST /posterior/hourly
-```
-
-Returns latent state distributions for each hour.
+**Interactive docs:** http://localhost:8000/docs (Swagger UI)
 
 ## 📊 Model Performance
 

@@ -36,19 +36,8 @@ class SQLiteService {
         
         if (savedDb) {
           this.db = new SQL.Database(savedDb);
-          // Ensure new tables exist even on older DBs (migration)
-          this.db.run(`
-            CREATE TABLE IF NOT EXISTS personal_migraine_profile (
-              id INTEGER PRIMARY KEY CHECK (id = 1),
-              migraine_history_years REAL NOT NULL,
-              menstrual_phase TEXT NOT NULL,
-              age REAL NOT NULL,
-              weight_kg REAL,
-              bmi REAL,
-              updated_at TEXT NOT NULL
-            )
-          `);
-          await this.saveToIndexedDB();
+          // Ensure schema exists (for migrations/updates)
+          await this.createSchema();
         } else {
           // Create new database
           this.db = new SQL.Database();
