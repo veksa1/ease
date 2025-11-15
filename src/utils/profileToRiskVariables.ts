@@ -20,37 +20,6 @@ export function profileToRiskVariables(profile: PersonalMigraineProfile | null):
     unit: 'yrs',
   });
 
-  // Menstrual Phase - certain phases have higher risk
-  const menstrualRiskMap: Record<PersonalMigraineProfile['menstrualPhase'], number> = {
-    'premenstrual': 15,
-    'menstrual': 12,
-    'perimenopause': 10,
-    'postmenstrual': 5,
-    'other': 5,
-    'none': 0,
-  };
-  
-  const menstrualPercentage = menstrualRiskMap[profile.menstrualPhase] || 0;
-  
-  if (menstrualPercentage > 0) {
-    const phaseLabels: Record<string, string> = {
-      'premenstrual': 'Premenstrual',
-      'menstrual': 'Menstrual',
-      'perimenopause': 'Perimenopause',
-      'postmenstrual': 'Postmenstrual',
-      'other': 'Other',
-      'none': 'Not applicable',
-    };
-    
-    variables.push({
-      name: 'Menstrual Phase',
-      percentage: menstrualPercentage,
-      category: 'personal',
-      value: phaseLabels[profile.menstrualPhase] || profile.menstrualPhase,
-      unit: '',
-    });
-  }
-
   // Age - very minor contribution (1-3%)
   // Younger (<25) and older (>50) may have slightly higher risk
   let agePercentage = 1;

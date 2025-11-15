@@ -3,7 +3,6 @@ import { PersonalMigraineProfile } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface OnboardingPersonalDetailsStepProps {
   initialValue?: Partial<PersonalMigraineProfile>;
@@ -18,7 +17,6 @@ export function OnboardingPersonalDetailsStep({
 }: OnboardingPersonalDetailsStepProps) {
   const [form, setForm] = useState<PersonalMigraineProfile>({
     migraineHistoryYears: initialValue?.migraineHistoryYears ?? 0,
-    menstrualPhase: initialValue?.menstrualPhase ?? 'none',
     age: initialValue?.age ?? 0,
     weightKg: initialValue?.weightKg,
     bmi: initialValue?.bmi,
@@ -34,12 +32,29 @@ export function OnboardingPersonalDetailsStep({
     e.preventDefault();
     setError(null);
 
-    if (!form.migraineHistoryYears || form.migraineHistoryYears <= 0) {
-      setError('Please enter how many years you have had migraines.');
+    // Validation
+    if (!form.migraineHistoryYears || form.migraineHistoryYears < 0) {
+      setError('Please enter how many years you have had migraines (minimum 0).');
       return;
     }
-    if (!form.age || form.age <= 0) {
-      setError('Please enter your age.');
+    if (form.migraineHistoryYears > 100) {
+      setError('Please enter a valid number of years (maximum 100).');
+      return;
+    }
+    if (!form.age || form.age < 0) {
+      setError('Please enter your age (minimum 0).');
+      return;
+    }
+    if (form.age > 120) {
+      setError('Please enter a valid age (maximum 120).');
+      return;
+    }
+    if (form.weightKg !== undefined && form.weightKg < 0) {
+      setError('Weight must be a positive number.');
+      return;
+    }
+    if (form.bmi !== undefined && (form.bmi < 0 || form.bmi > 100)) {
+      setError('Please enter a valid BMI (0-100).');
       return;
     }
 
@@ -54,7 +69,7 @@ export function OnboardingPersonalDetailsStep({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6">
+    <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6 pb-6">
       <div className="space-y-2">
         <h1 className="text-h1">Tell us about your migraine history</h1>
         <p className="text-body text-muted-foreground">
@@ -62,70 +77,79 @@ export function OnboardingPersonalDetailsStep({
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Migraine History Years */}
         <div className="space-y-2">
-          <Label htmlFor="migraineHistoryYears">How many years have you had migraines?</Label>
+          <Label htmlFor="migraineHistoryYears" className="text-body font-medium">
+            How many years have you had migraines?
+          </Label>
           <Input
             id="migraineHistoryYears"
             type="number"
             min={0}
+            max={100}
             inputMode="numeric"
-            value={form.migraineHistoryYears.toString()}
+            placeholder="0"
+            className="h-12 text-base"
+            style={{ borderRadius: '12px' }}
+            value={form.migraineHistoryYears || ''}
             onChange={e => updateField('migraineHistoryYears', Number(e.target.value) || 0)}
           />
         </div>
 
+        {/* Age */}
         <div className="space-y-2">
-          <Label htmlFor="menstrualPhase">Menstrual phase (optional)</Label>
-          <Select
-            value={form.menstrualPhase}
-            onValueChange={value => updateField('menstrualPhase', value as PersonalMigraineProfile['menstrualPhase'])}
-          >
-            <SelectTrigger id="menstrualPhase">
-              <SelectValue placeholder="Select phase" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Not applicable</SelectItem>
-              <SelectItem value="premenstrual">Premenstrual</SelectItem>
-              <SelectItem value="menstrual">Menstrual</SelectItem>
-              <SelectItem value="postmenstrual">Postmenstrual</SelectItem>
-              <SelectItem value="perimenopause">Perimenopause</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="age">Age</Label>
+          <Label htmlFor="age" className="text-body font-medium">
+            Age
+          </Label>
           <Input
             id="age"
             type="number"
             min={0}
+            max={120}
             inputMode="numeric"
-            value={form.age.toString()}
+            placeholder="0"
+            className="h-12 text-base"
+            style={{ borderRadius: '12px' }}
+            value={form.age || ''}
             onChange={e => updateField('age', Number(e.target.value) || 0)}
           />
         </div>
 
+        {/* Weight and BMI - Two Column Grid */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="weightKg">Weight (kg, optional)</Label>
+            <Label htmlFor="weightKg" className="text-label">
+              Weight (kg, optional)
+            </Label>
             <Input
               id="weightKg"
               type="number"
               min={0}
-              inputMode="numeric"
+              max={500}
+              step="0.1"
+              inputMode="decimal"
+              placeholder="Optional"
+              className="h-12 text-base"
+              style={{ borderRadius: '12px' }}
               value={form.weightKg?.toString() ?? ''}
               onChange={e => updateField('weightKg', e.target.value ? Number(e.target.value) : undefined)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bmi">BMI (optional)</Label>
+            <Label htmlFor="bmi" className="text-label">
+              BMI (optional)
+            </Label>
             <Input
               id="bmi"
               type="number"
               min={0}
+              max={100}
+              step="0.1"
               inputMode="decimal"
+              placeholder="Optional"
+              className="h-12 text-base"
+              style={{ borderRadius: '12px' }}
               value={form.bmi?.toString() ?? ''}
               onChange={e => updateField('bmi', e.target.value ? Number(e.target.value) : undefined)}
             />
@@ -134,17 +158,23 @@ export function OnboardingPersonalDetailsStep({
       </div>
 
       {error && (
-        <p className="text-sm text-critical" role="alert">
-          {error}
-        </p>
+        <div 
+          className="p-4 rounded-xl bg-critical/10 border border-critical/20"
+          style={{ borderRadius: '12px' }}
+          role="alert"
+        >
+          <p className="text-sm text-critical font-medium">
+            {error}
+          </p>
+        </div>
       )}
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-3 pt-4">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
-          className="flex-1 h-12"
+          className="flex-1 h-12 text-base"
           style={{ borderRadius: '12px' }}
           disabled={submitting}
         >
@@ -152,7 +182,7 @@ export function OnboardingPersonalDetailsStep({
         </Button>
         <Button
           type="submit"
-          className="flex-1 h-12"
+          className="flex-1 h-12 text-base"
           style={{ borderRadius: '12px' }}
           disabled={submitting}
         >
