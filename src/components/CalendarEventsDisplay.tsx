@@ -32,6 +32,13 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
+  // Debug: Log what's in localStorage
+  useEffect(() => {
+    console.log('[CalendarEventsDisplay] Checking localStorage for userId:', userId);
+    console.log('[CalendarEventsDisplay] calendar_demo-user:', localStorage.getItem('calendar_demo-user'));
+    console.log('[CalendarEventsDisplay] All localStorage keys:', Object.keys(localStorage));
+  }, []);
+
   useEffect(() => {
     fetchCalendarEvents();
   }, [userId, date]);
@@ -43,6 +50,7 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
     try {
       // First check if calendar is connected
       const status = await calendarService.getCalendarStatus(userId);
+      console.log('Calendar status:', status);
       setIsConnected(status.connected);
 
       if (!status.connected) {
@@ -51,10 +59,13 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
       }
 
       // Fetch calendar events for the selected date
+      console.log('Fetching events for date:', date);
       const events = await calendarService.getCalendarEvents(userId, date);
+      console.log('Received events:', events);
       setEvents(events);
       setLoading(false);
     } catch (err) {
+      console.error('Calendar events error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load calendar events');
       setLoading(false);
     }
@@ -141,22 +152,22 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
         {events.map((event) => (
           <div
             key={event.id}
-            className="p-3 bg-card rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            className="p-2.5 md:p-3 bg-card rounded-lg border border-border hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
+                <p className="text-xs md:text-sm font-medium text-foreground truncate mb-1">
                   {event.title}
                 </p>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
+                <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-1 flex-shrink-0">
                     <Clock className="w-3 h-3" />
                     {formatTime(event.start)}
                   </span>
                   {event.location && (
                     <span className="flex items-center gap-1 truncate">
-                      <MapPin className="w-3 h-3" />
-                      {event.location}
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{event.location}</span>
                     </span>
                   )}
                 </div>
@@ -169,10 +180,10 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-label font-medium text-foreground flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
+    <div className="space-y-2 md:space-y-3">
+      <div className="flex items-center justify-between mb-1 md:mb-2">
+        <h3 className="text-sm md:text-label font-medium text-foreground flex items-center gap-2">
+          <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
           Calendar Events
         </h3>
         <span className="text-xs text-muted-foreground">
@@ -180,43 +191,43 @@ export function CalendarEventsDisplay({ userId, date = new Date(), compact = fal
         </span>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2 md:space-y-3">
         {events.map((event) => (
           <div
             key={event.id}
-            className="p-4 bg-card rounded-lg border border-border hover:shadow-sm transition-shadow"
+            className="p-3 md:p-4 bg-card rounded-lg border border-border hover:shadow-sm transition-shadow"
           >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
+            <div className="flex items-start gap-2.5 md:gap-3">
+              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Calendar className="w-4 h-4 md:w-5 md:h-5 text-primary" />
               </div>
               
               <div className="flex-1 min-w-0">
-                <h4 className="text-base font-medium text-foreground mb-2">
+                <h4 className="text-sm md:text-base font-medium text-foreground mb-1.5 md:mb-2">
                   {event.title}
                 </h4>
                 
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4" />
+                <div className="space-y-1 md:space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0" />
                     <span>
                       {formatTime(event.start)} - {formatTime(event.end)}
                     </span>
-                    <span className="text-xs">
+                    <span className="text-xs hidden md:inline">
                       ({formatDuration(event.start, event.end)})
                     </span>
                   </div>
                   
                   {event.location && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0" />
                       <span className="truncate">{event.location}</span>
                     </div>
                   )}
                   
                   {event.attendees && event.attendees > 1 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Users className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                      <Users className="w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0" />
                       <span>{event.attendees} attendees</span>
                     </div>
                   )}
