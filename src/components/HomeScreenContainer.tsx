@@ -49,7 +49,7 @@ export function HomeScreenContainer({
 
   // Contextual action based on risk
   const contextualAction = {
-    icon: Coffee,
+    icon: Activity, // Placeholder icon (won't be rendered)
     label: riskLevel === 'low' ? 'Keep up the good habits!' :
            riskLevel === 'moderate' ? 'Consider a breathing break' :
            'Take it easy today'

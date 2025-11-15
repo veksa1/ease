@@ -221,7 +221,6 @@ export function HomeScreen({
               style={{ borderRadius: '12px' }}
               onClick={onSootheModeClick}
             >
-              <ContextualIcon className="w-4 h-4" />
               <span className="truncate">{contextualAction.label}</span>
             </Button>
           </div>
