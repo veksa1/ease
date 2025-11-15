@@ -97,7 +97,15 @@ def load_model_and_config():
         
         # Load model
         checkpoint_path = Path(__file__).parent.parent / service_config['model']['checkpoint_path']
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        if not checkpoint_path.exists():
+            logger.warning(f"Model checkpoint not found at {checkpoint_path}")
+            logger.warning("Service will start but model predictions will be unavailable")
+            app_state['model_loaded'] = False
+            app_state['config'] = service_config
+            return
+        
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         
         model = SimpleALINE(
             in_dim=model_config['in_dim'],
@@ -151,7 +159,15 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Load model on startup"""
-    load_model_and_config()
+    import os
+    logger.info(f"Starting ALINE service on port {os.getenv('PORT', '8000')}")
+    logger.info(f"Host: {os.getenv('HOST', '0.0.0.0')}")
+    try:
+        load_model_and_config()
+        logger.info("✓ Startup completed successfully")
+    except Exception as e:
+        logger.error(f"✗ Startup failed: {e}", exc_info=True)
+        raise
 
 
 @app.get("/health", response_model=HealthResponse)

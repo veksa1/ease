@@ -25,6 +25,9 @@ COPY models/ ./models/
 COPY service/ ./service/
 COPY configs/ ./configs/
 
+# Copy model checkpoint
+COPY runs/checkpoints/best.pt ./runs/checkpoints/best.pt
+
 # Create data directory for SQLite database
 RUN mkdir -p /app/data
 
@@ -40,7 +43,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Run the FastAPI service
-CMD ["uv", "run", "uvicorn", "service.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the FastAPI service using the main.py entry point which respects PORT env var
+CMD ["uv", "run", "python", "-m", "service.main"]
