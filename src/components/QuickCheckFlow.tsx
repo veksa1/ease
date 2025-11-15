@@ -9,23 +9,23 @@ interface QuickCheckFlowProps {
 }
 
 export interface QuickCheckData {
-  caffeine: { level: 'none' | 'some' | 'lot' | null };
-  water: { amount: 'none' | 'low' | 'medium' | 'high' | null };
+  caffeine: { level: 'none' | 'normal' | 'lot' };
+  water: { amount: 'none' | 'low' | 'medium' | 'high' };
   food: { level: number };
 }
 
 export function QuickCheckFlow({ onComplete, onBack, streakCount = 5 }: QuickCheckFlowProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 'success'>(1);
   const [data, setData] = useState<QuickCheckData>({
-    caffeine: { level: null },
-    water: { amount: null },
+    caffeine: { level: 'normal' },
+    water: { amount: 'medium' },
     food: { level: 5 },
   });
 
   const next = () => {
     if (step === 1) setStep(2);
     else if (step === 2) setStep(3);
-    else if (step === 3) setStep('success');
+    else if (step === 3) finish();
   };
   const back = () => {
     if (step === 2) setStep(1);
@@ -37,7 +37,7 @@ export function QuickCheckFlow({ onComplete, onBack, streakCount = 5 }: QuickChe
     onComplete?.(data);
     setStep('success');
   };
-  const progress = step === 'success' ? 100 : (step - 1) * (100 / 3);
+  const progress = step === 'success' ? 100 : ((step as number) / 3) * 100;
 
   if (step === 'success') {
     return (
@@ -64,7 +64,7 @@ export function QuickCheckFlow({ onComplete, onBack, streakCount = 5 }: QuickChe
         <div className="space-y-4">
           <h2 className="text-h2">Caffeine today?</h2>
           <div className="flex flex-col gap-3">
-            {(['none', 'some', 'lot'] as const).map(level => (
+            {(['none', 'normal', 'lot'] as const).map(level => (
               <button
                 key={level}
                 onClick={() => setData(d => ({ ...d, caffeine: { level } }))}
@@ -72,7 +72,7 @@ export function QuickCheckFlow({ onComplete, onBack, streakCount = 5 }: QuickChe
                 style={{ borderRadius: '12px' }}
               >
                 <h3 className="text-body capitalize">{level}</h3>
-                <p className="text-label text-muted-foreground">{level === 'none' ? '0 mg' : level === 'some' ? '~50–150 mg' : '200+ mg'}</p>
+                <p className="text-label text-muted-foreground">{level === 'none' ? '0 mg' : level === 'normal' ? '~50–150 mg' : '200+ mg'}</p>
               </button>
             ))}
           </div>
@@ -114,7 +114,7 @@ export function QuickCheckFlow({ onComplete, onBack, streakCount = 5 }: QuickChe
       <div className="flex gap-3">
         <Button variant="outline" onClick={back} className="flex-1">Back</Button>
         {step < 3 && (
-          <Button onClick={next} className="flex-1" disabled={(step === 1 && data.caffeine.level === null) || (step === 2 && data.water.amount === null)}>Next</Button>
+          <Button onClick={next} className="flex-1">Next</Button>
         )}
         {step === 3 && <Button onClick={finish} className="flex-1">Finish</Button>}
       </div>
