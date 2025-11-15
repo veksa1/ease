@@ -17,10 +17,22 @@ import { InsightsScreen } from './components/InsightsScreen';
 import { SootheMode } from './components/SootheMode';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useRiskPrediction } from './hooks/useDemoData';
+import { DemoResetButton } from './components/DemoResetButton';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<string>('onboarding-1');
+  
+  // Check if user has seen onboarding
+  const [hasSeenOnboarding] = useState(() => {
+    return localStorage.getItem('ease_has_seen_onboarding') === 'true';
+  });
+  
+  const [currentScreen, setCurrentScreen] = useState<string>(() => {
+    // Skip onboarding if already seen
+    if (hasSeenOnboarding) return 'home';
+    return 'onboarding-1';
+  });
+  
   const [onboardingStep, setOnboardingStep] = useState(1);
   
   // Get risk prediction hook to update risk
@@ -77,10 +89,17 @@ export default function App() {
     }
   };
 
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('ease_has_seen_onboarding', 'true');
+    setCurrentScreen('home');
+  };
+
   const handleOnboardingSkip = () => {
     if (onboardingStep < 3) {
       setOnboardingStep(3);
       setCurrentScreen('onboarding-3');
+    } else {
+      handleOnboardingComplete();
     }
   };
 
@@ -476,7 +495,7 @@ export default function App() {
 
             <div className="pt-2 space-y-3">
               <Button
-                onClick={() => setCurrentScreen('home')}
+                onClick={handleOnboardingComplete}
                 disabled={!hasConnectedDevice()}
                 className="w-full h-12"
                 style={{ borderRadius: '12px' }}
@@ -485,7 +504,7 @@ export default function App() {
               </Button>
               <div className="text-center">
                 <button
-                  onClick={() => setCurrentScreen('home')}
+                  onClick={handleOnboardingComplete}
                   className="text-label text-muted-foreground hover:text-foreground transition-colors underline p-2"
                   style={{ minHeight: '44px' }}
                 >
@@ -573,6 +592,9 @@ export default function App() {
           />
         </>
       )}
+      
+      {/* Demo Reset Button */}
+      <DemoResetButton />
     </div>
   );
 }
