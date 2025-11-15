@@ -22,6 +22,7 @@ import { ReportMigraineModal } from './ReportMigraineMigral';
 import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
 import { RiskVariable } from '../types';
+import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
 import {
   Carousel,
   CarouselContent,
@@ -84,6 +85,9 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [showDisclaimer, setShowDisclaimer] = React.useState(true);
   const [notificationDismissed, setNotificationDismissed] = React.useState(false);
+  const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
+  const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
+  const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
   
   // Risk variables data for SootheMode
   const riskVariables: RiskVariable[] = [
@@ -201,6 +205,58 @@ export function HomeScreen({
               }
               onDismiss={() => setNotificationDismissed(true)}
             />
+          )}
+
+          {/* Follow-up reminder (if due) */}
+          {firstPending && (
+            <div
+              className="border rounded-xl p-4 bg-accent/5 border-accent/20"
+              style={{ borderRadius: '12px' }}
+              role="region"
+              aria-label="SootheMode follow-up"
+            >
+              <p className="text-body mb-3">
+                How did your prevention plan work?
+              </p>
+              <p className="text-label text-muted-foreground mb-4">
+                Triggers: {firstPending.triggerLabels}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="bg-success text-success-foreground hover:bg-success/90"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'prevented')}
+                >
+                  Prevented
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-warning/30 text-warning hover:bg-warning/10"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'reduced')}
+                >
+                  Reduced
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-critical/30 text-critical hover:bg-critical/10"
+                  style={{ borderRadius: '8px' }}
+                  onClick={() => recordOutcome(firstPending.id, 'no-effect')}
+                >
+                  No effect
+                </Button>
+                <button
+                  className="text-label text-muted-foreground hover:text-foreground px-2"
+                  onClick={() => setDismissedFollowUpIds(prev => new Set(prev).add(firstPending.id))}
+                  aria-label="Dismiss follow-up"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Risk Module - Enhanced Gradient Hero Card */}

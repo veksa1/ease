@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX, ChevronDown } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { RiskVariable, TriggerCombination, InterventionInstruction } from '../types';
 import { detectTriggerCombination, generateInstructions } from '../utils/sootheModeInstructions';
@@ -12,10 +12,7 @@ interface SootheModeProps {
 }
 
 export function SootheMode({ onClose, riskVariables, riskPercentage }: SootheModeProps) {
-  const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
-  const [isRunning, setIsRunning] = useState(true);
-  const [isDimmed, setIsDimmed] = useState(false);
-  const [isSoundOn, setIsSoundOn] = useState(true);
+  const [startedAt] = useState<Date>(() => new Date());
   const [instructions, setInstructions] = useState<InterventionInstruction[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [triggerCombination, setTriggerCombination] = useState<TriggerCombination | null>(null);
@@ -41,44 +38,18 @@ export function SootheMode({ onClose, riskVariables, riskPercentage }: SootheMod
     loadInstructions();
   }, [riskVariables, riskPercentage]);
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isRunning && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, timeRemaining]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleKeepGoing = () => {
-    setTimeRemaining((prev) => prev + 300); // Add 5 more minutes
-    setIsRunning(true);
-  };
-
   const handleClose = async () => {
     // Save session data
     try {
       if (triggerCombination) {
+        const durationMinutes = Math.max(0, (Date.now() - startedAt.getTime()) / 60000);
         await sqliteService.saveSootheModeSession({
           id: sessionId,
-          startedAt: new Date().toISOString(),
+          startedAt: startedAt.toISOString(),
           triggerCombination,
           instructions,
           completedInstructionIds: Array.from(completedIds),
-          durationMinutes: (300 - timeRemaining) / 60,
+          durationMinutes,
         });
       }
     } catch (error) {
@@ -100,11 +71,6 @@ export function SootheMode({ onClose, riskVariables, riskPercentage }: SootheMod
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      {/* Dim overlay */}
-      {isDimmed && (
-        <div className="absolute inset-0 pointer-events-none bg-black/40" />
-      )}
-
       {/* Close button - Fixed at top with higher z-index */}
       <div className="relative z-10 flex justify-end px-6 pt-6">
         <button
@@ -192,13 +158,6 @@ export function SootheMode({ onClose, riskVariables, riskPercentage }: SootheMod
           </Button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes breathe {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(1.2); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
