@@ -1,95 +1,70 @@
-# ALINE Migraine Simulator Configuration
-# Ticket 004 - Bayesian / Markov Simulator for Synthetic Migraine Episodes
-# === Same as before, only showing changed parts ===
-
-# Dataset parameters
 n_users: 10000
 horizon: 365
 train_split: 0.8
 random_seed: 42
-
 latent_dim: 4
-
-# Make episodes more persistent + a bit stronger coupling
+# State transition matrix (normalized for stability - rows sum to 0.95)
+# Prevents exponential growth over long horizons (365 days)
 state_transition_matrix:
-  - [0.85, 0.15, 0.05, 0.05]   # stress: more persistence, sleep feeds into stress
-  - [0.10, 0.80, 0.05, 0.10]   # sleepDebt: stronger persistence
-  - [0.05, 0.05, 0.90, 0.05]   # hormonal: high persistence (quasi-trend / cycle)
-  - [0.10, 0.05, 0.05, 0.85]   # envLoad: more persistence
-
-# Stronger feature → latent influence
+- [0.734, 0.130, 0.043, 0.043]
+- [0.090, 0.724, 0.045, 0.090]
+- [0.045, 0.045, 0.814, 0.045]
+- [0.090, 0.045, 0.045, 0.769]
 input_weights:
-  stress: 0.05        # was 0.01
-  sleep: 0.06         # was 0.01
-  hormonal: 0.04      # was 0.008
-  environmental: 0.03 # was 0.005
-
-# Keep noise similar so we still get variability but not pure noise
+  stress: 0.05
+  sleep: 0.06
+  hormonal: 0.04
+  environmental: 0.03
 process_noise:
   stress: 0.15
   sleepDebt: 0.12
-  hormonal: 0.10
+  hormonal: 0.1
   envLoad: 0.08
-
-# Make latents matter much more for migraine risk
 migraine_model:
-  # Stronger weights so that high-stress / high-debt / hormonal peaks really stand out
-  weights: [1.6, 1.4, 1.8, 0.9]   # [stress, sleepDebt, hormonal, envLoad]
-  # Start with a slightly more negative bias to avoid migraine rate exploding
-  bias: -2.4                        # adjust after looking at resulting baseline
-
-baseline_migraine_rate: 0.15  # target, not enforced
-
-# Data paths
+  # Weights optimized for 365-day simulations with stable state transition matrix
+  # For 10-day horizons, use: [0.542, 0.474, 0.610, 0.305]
+  weights: [0.271, 0.237, 0.305, 0.152]  # [stress, sleepDebt, hormonal, envLoad]
+  bias: -3.0
+baseline_migraine_rate: 0.15
 paths:
   priors: data/priors.yaml
   feature_metadata: data/migraine_features_augmented.csv
   output_train: data/synthetic_migraine_train.csv
   output_val: data/synthetic_migraine_val.csv
   output_meta: data/synthetic_migraine_meta.json
-
-# Feature order (must match CSV column order)
-# 35 total features: 20 base + 4 temporal (Ticket 020) + 11 new (Ticket 025)
 feature_order:
-  # Base 20 features
-  - Sleep Duration (hours)
-  - Sleep Quality (1-10)
-  - Sleep Consistency Score
-  - Stress Level (1-10)
-  - Work Hours
-  - Anxiety Score (1-10)
-  - Caffeine Intake (mg)
-  - Water Intake (L)
-  - Meal Regularity (1-10)
-  - Exercise Duration (min)
-  - Physical Activity Level (1-10)
-  - Neck Tension (1-10)
-  - Screen Time (hours)
-  - Weather Pressure (hPa)
-  - Noise Level (dB)
-  - Hormone Fluctuation Index
-  - Menstrual Cycle Day
-  - Alcohol Consumption (units)
-  - Smoking (cigarettes/day)
-  - Meditation Time (min)
-  # Temporal features (Ticket 020)
-  - day_of_week_sin
-  - day_of_week_cos
-  - week_of_year_sin
-  - week_of_year_cos
-  # New biometric features (Ticket 025)
-  - HRV
-  - Resting Heart Rate
-  - Body Temperature Change
-  # New environmental features (Ticket 025)
-  - Barometric Pressure Change
-  - Air Quality Index
-  - Altitude
-  # New manual tracking features (Ticket 025)
-  - Prodrome Symptoms
-  # Demographic features (Ticket 025)
-  - Age
-  - Body Weight
-  - BMI
-  # Medical history (Ticket 025)
-  - Migraine History Years
+- Sleep Duration (hours)
+- Sleep Quality (1-10)
+- Sleep Consistency Score
+- Stress Level (1-10)
+- Work Hours
+- Anxiety Score (1-10)
+- Caffeine Intake (mg)
+- Water Intake (L)
+- Meal Regularity (1-10)
+- Exercise Duration (min)
+- Physical Activity Level (1-10)
+- Neck Tension (1-10)
+- Screen Time (hours)
+- Weather Pressure (hPa)
+- Noise Level (dB)
+- Hormone Fluctuation Index
+- Menstrual Cycle Day
+- Alcohol Consumption (units)
+- Smoking (cigarettes/day)
+- Meditation Time (min)
+- day_of_week_sin
+- day_of_week_cos
+- week_of_year_sin
+- week_of_year_cos
+- HRV
+- Resting Heart Rate
+- Body Temperature Change
+- Barometric Pressure Change
+- Air Quality Index
+- Altitude
+- Prodrome Symptoms
+- Age
+- Body Weight
+- BMI
+- Migraine History Years
