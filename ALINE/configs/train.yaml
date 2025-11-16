@@ -21,14 +21,17 @@ model:
 # Training hyperparameters
 training:
   batch_size: 32
-  learning_rate: 0.001
+  learning_rate: 0.0001  # Reduced from 0.001 to prevent exploding gradients
   num_epochs: 500  # Reduced for testing
   sequence_length: 24  # 24-hour windows
   
-  # Loss weights
-  alpha_policy: 0.1  # Weight for policy loss
-  beta_migraine: 1.0  # Weight for migraine prediction loss
-  lambda_sigma: 0.5  # Weight for sigma regularization in posterior loss
+  # Loss weights (reduced to prevent explosion)
+  alpha_policy: 0.01  # Weight for policy loss (reduced from 0.1)
+  beta_migraine: 0.5  # Weight for migraine prediction loss (reduced from 1.0)
+  lambda_sigma: 0.1  # Weight for sigma regularization in posterior loss (reduced from 0.5)
+  
+  # Gradient clipping
+  max_grad_norm: 0.5  # Clip gradients to prevent explosion
   
   # Optimizer
   optimizer: adam
@@ -36,7 +39,7 @@ training:
   
   # Scheduler
   scheduler: cosine
-  warmup_epochs: 5
+  warmup_epochs: 10  # Increased warmup for stability
   
   # Early stopping
   patience: 10

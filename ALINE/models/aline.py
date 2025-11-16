@@ -58,6 +58,22 @@ class SimpleALINE(nn.Module):
         self.z_dim = z_dim
         self.d_model = d_model
         
+        # Initialize weights for stability
+        self._init_weights()
+        
+    def _init_weights(self):
+        """Initialize weights with small values to prevent gradient explosion"""
+        # Initialize linear layers with Xavier uniform
+        for name, param in self.named_parameters():
+            if 'weight' in name and param.dim() >= 2:
+                nn.init.xavier_uniform_(param, gain=0.5)  # Small gain for stability
+            elif 'bias' in name:
+                nn.init.constant_(param, 0.0)
+        
+        # Initialize posterior head with even smaller weights
+        nn.init.xavier_uniform_(self.post_head.weight, gain=0.1)
+        nn.init.constant_(self.post_head.bias, 0.0)
+        
     def forward(self, x):
         """
         Forward pass through the ALINE model.

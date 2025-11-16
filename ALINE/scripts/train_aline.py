@@ -171,9 +171,21 @@ class MigraineDataset(Dataset):
     
     def __getitem__(self, idx):
         seq = self.sequences[idx]
+        features = torch.FloatTensor(seq['features'])
+        latents = torch.FloatTensor(seq['latents'])
+        
+        # Check for NaN/Inf in data
+        if torch.isnan(features).any() or torch.isinf(features).any():
+            logger.warning(f"NaN/Inf detected in features at index {idx}")
+            # Replace NaN/Inf with zeros
+            features = torch.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
+        if torch.isnan(latents).any() or torch.isinf(latents).any():
+            logger.warning(f"NaN/Inf detected in latents at index {idx}")
+            latents = torch.nan_to_num(latents, nan=0.0, posinf=0.0, neginf=0.0)
+        
         return {
-            'features': torch.FloatTensor(seq['features']),
-            'latents': torch.FloatTensor(seq['latents']),
+            'features': features,
+            'latents': latents,
             'migraine_next': torch.FloatTensor([seq['migraine_next']]),
             'migraine_prob_next': torch.FloatTensor([seq['migraine_prob_next']])
         }
@@ -198,6 +210,10 @@ def compute_posterior_loss(posterior, target_latents, lambda_sigma=0.5):
     target_sigma = torch.ones_like(sigma) * 0.5
     loss_sigma = nn.functional.mse_loss(sigma, target_sigma)
     
+    # Clamp to prevent explosion
+    loss_mu = torch.clamp(loss_mu, max=100.0)
+    loss_sigma = torch.clamp(loss_sigma, max=10.0)
+    
     return loss_mu + lambda_sigma * loss_sigma
 
 
@@ -218,8 +234,9 @@ def compute_policy_loss(posterior, policy_scores, migraine_weights, k=3):
     # p = sigmoid(w @ mu + b)
     p = torch.sigmoid((mu @ migraine_weights.unsqueeze(-1)).squeeze(-1))  # [B, T]
     
-    # Entropy of migraine prediction
-    entropy = -(p * torch.log(p + 1e-6) + (1 - p) * torch.log(1 - p + 1e-6))
+    # Entropy of migraine prediction (clamped for stability)
+    p_clamped = torch.clamp(p, min=1e-6, max=1-1e-6)
+    entropy = -(p_clamped * torch.log(p_clamped) + (1 - p_clamped) * torch.log(1 - p_clamped))
     
     # Uncertainty: entropy + variance in latent state
     uncertainty = entropy + 0.1 * sigma.mean(dim=-1)  # [B, T]
@@ -230,6 +247,9 @@ def compute_policy_loss(posterior, policy_scores, migraine_weights, k=3):
     # Maximize uncertainty at selected hours (minimize negative)
     selected_uncertainty = torch.gather(uncertainty, 1, topk_indices)
     policy_loss = -selected_uncertainty.mean()
+    
+    # Clamp policy loss to prevent explosion
+    policy_loss = torch.clamp(policy_loss, min=-10.0, max=10.0)
     
     return policy_loss
 
@@ -274,24 +294,41 @@ def train_epoch(model, dataloader, optimizer, device, config):
         
         # Migraine prediction loss (from last time step)
         mu_last = posterior.mean[:, -1, :]  # [B, z_dim]
-        p_migraine = torch.sigmoid((mu_last @ migraine_weights) + migraine_bias)
-        loss_migraine = nn.functional.binary_cross_entropy(p_migraine, migraine_next.squeeze())
+        logits = (mu_last @ migraine_weights) + migraine_bias
+        # Use BCE with logits for numerical stability
+        loss_migraine = nn.functional.binary_cross_entropy_with_logits(logits, migraine_next.squeeze())
+        # Clamp migraine loss
+        loss_migraine = torch.clamp(loss_migraine, max=10.0)
         
         # Combined loss
         loss = (loss_post + 
                 config['training']['alpha_policy'] * loss_policy + 
                 config['training']['beta_migraine'] * loss_migraine)
         
+        # Check for extreme loss before backward pass
+        loss_val = loss.item()
+        if torch.isnan(loss) or torch.isinf(loss) or loss_val > 1000.0:
+            logger.warning(f"Extreme/invalid loss detected: {loss_val:.2e} at batch {batch_idx}. Skipping batch.")
+            logger.debug(f"  posterior_loss={loss_post.item():.2e}, policy_loss={loss_policy.item():.2e}, migraine_loss={loss_migraine.item():.2e}")
+            continue
+        
         # Backward pass
         optimizer.zero_grad()
         loss.backward()
         
-        # Gradient clipping for stability
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        # Gradient clipping for stability (use config value)
+        max_norm = config['training'].get('max_grad_norm', 0.5)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
         
-        # Check for NaN/Inf gradients
-        if torch.isnan(loss) or torch.isinf(loss):
-            logger.error(f"NaN/Inf detected in loss at batch {batch_idx}! Skipping batch.")
+        # Check for NaN/Inf gradients after backward
+        has_nan_grad = False
+        for name, param in model.named_parameters():
+            if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
+                logger.warning(f"NaN/Inf gradient in {name}")
+                has_nan_grad = True
+                
+        if has_nan_grad:
+            logger.error(f"NaN/Inf detected in gradients at batch {batch_idx}! Skipping batch.")
             optimizer.zero_grad()
             continue
         
