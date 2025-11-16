@@ -9,7 +9,8 @@ import { useState, useEffect } from 'react';
 import { demoDataService } from '../services/demoDataService';
 import { quickCheckToRiskAdjustment, quickCheckToFeatures, type QuickCheckData } from '../services/featureConverter';
 import { riskPredictionService } from '../services/riskPredictionService';
-import { posteriorService, type HourlyPosterior } from '../services/posteriorService';
+import { posteriorService, type HourlyPosterior, type PosteriorResponse } from '../services/posteriorService';
+import type { PolicyResponse } from '../services/policyService';
 import { userFeaturesService } from '../services/userFeaturesService';
 import type { Correlation, CalendarDay, HourlyRisk, UserTimelineEntry } from '../types/aline';
 
@@ -76,7 +77,7 @@ export function useRiskPrediction() {
 
   /**
    * Update risk based on QuickCheck responses
-   * Also fetches hourly posterior if backend is available
+   * Also fetches hourly posterior and policy recommendations if backend is available
    */
   const updateRiskWithQuickCheck = async (checkData: QuickCheckData) => {
     const adjustment = quickCheckToRiskAdjustment(checkData);
@@ -91,13 +92,17 @@ export function useRiskPrediction() {
       checkData
     );
     
-    // If backend is connected, fetch hourly posterior
+    let posteriorData = null;
+    let policyData = null;
+    
+    // If backend is connected, fetch hourly posterior and policy recommendations
     if (isBackendConnected) {
       try {
         const features = quickCheckToFeatures(checkData, 20);
         const userId = 'demo-user';
         
-        const posteriorData = await posteriorService.getHourlyPosterior(userId, features);
+        // Fetch posterior distributions
+        posteriorData = await posteriorService.getHourlyPosterior(userId, features);
         
         if (posteriorData) {
           console.log('✅ Fetched hourly posterior from Quick Check data');
@@ -117,10 +122,25 @@ export function useRiskPrediction() {
             }
           );
         }
+        
+        // Fetch policy recommendations for information gain
+        const { policyService } = await import('../services/policyService');
+        policyData = await policyService.getTopKHours(userId, features, 3);
+        
+        if (policyData) {
+          console.log('✅ Fetched policy recommendations');
+          console.log(`   Top measurement hours: ${policyData.selected_hours.map(h => `${h.hour}h (score: ${h.priority_score.toFixed(2)})`).join(', ')}`);
+        }
       } catch (error) {
-        console.error('Failed to fetch hourly posterior:', error);
+        console.error('Failed to fetch hourly posterior or policy:', error);
       }
     }
+    
+    return {
+      newRisk,
+      posteriorData,
+      policyData,
+    };
   };
 
   return { loading, risk, bounds, isBackendConnected, updateRiskWithQuickCheck };

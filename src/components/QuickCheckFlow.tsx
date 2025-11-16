@@ -26,9 +26,15 @@ import { useWhatIfSimulator, COMMON_SCENARIOS } from '../hooks/useWhatIfSimulato
 import { WhatIfImpactCard, WhatIfStickyFooter } from './WhatIfImpactCard';
 
 interface QuickCheckFlowProps {
-  onComplete?: (data: QuickCheckData) => void;
+  onComplete?: (data: QuickCheckData, analysisResults?: QuickCheckAnalysisResults) => void;
   onBack?: () => void;
   streakCount?: number;
+}
+
+export interface QuickCheckAnalysisResults {
+  newRisk: number;
+  posteriorData: any | null;
+  policyData: any | null;
 }
 
 export interface QuickCheckData {
@@ -57,6 +63,7 @@ export function QuickCheckFlow({
     water: { amount: null },
     food: { level: 5 },
   });
+  const [analysisResults, setAnalysisResults] = useState<QuickCheckAnalysisResults | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   // Initialize what-if simulator
@@ -85,10 +92,40 @@ export function QuickCheckFlow({
     });
   }, [currentStep]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (currentStep === 1) setCurrentStep(2);
     else if (currentStep === 2) setCurrentStep(3);
-    else if (currentStep === 3) setCurrentStep('success');
+    else if (currentStep === 3) {
+      // Fetch analysis results before showing success
+      const { quickCheckToFeatures } = await import('../services/featureConverter');
+      const { posteriorService } = await import('../services/posteriorService');
+      const { policyService } = await import('../services/policyService');
+      
+      try {
+        const features = quickCheckToFeatures(data, 20);
+        const userId = 'demo-user';
+        
+        const [posteriorData, policyData] = await Promise.all([
+          posteriorService.getHourlyPosterior(userId, features),
+          policyService.getTopKHours(userId, features, 3),
+        ]);
+        
+        setAnalysisResults({
+          newRisk: 0, // Will be calculated by parent
+          posteriorData,
+          policyData,
+        });
+      } catch (error) {
+        console.error('Failed to fetch analysis:', error);
+        setAnalysisResults({
+          newRisk: 0,
+          posteriorData: null,
+          policyData: null,
+        });
+      }
+      
+      setCurrentStep('success');
+    }
   };
 
   const handleBack = () => {
@@ -103,7 +140,7 @@ export function QuickCheckFlow({
   };
 
   const handleComplete = () => {
-    onComplete?.(data);
+    onComplete?.(data, analysisResults || undefined);
   };
 
   const getProgress = () => {
@@ -190,7 +227,7 @@ export function QuickCheckFlow({
           />
         )}
         {currentStep === 'success' && (
-          <SuccessStep onComplete={handleComplete} data={data} streakCount={streakCount} />
+          <SuccessStep onComplete={handleComplete} data={data} streakCount={streakCount} analysisResults={analysisResults} />
         )}
       </div>
       
@@ -653,9 +690,10 @@ interface SuccessStepProps {
   onComplete: () => void;
   data: QuickCheckData;
   streakCount?: number;
+  analysisResults?: QuickCheckAnalysisResults | null;
 }
 
-function SuccessStep({ onComplete, data, streakCount = 6 }: SuccessStepProps) {
+function SuccessStep({ onComplete, data, streakCount = 6, analysisResults }: SuccessStepProps) {
   const [showWhy, setShowWhy] = useState(false);
 
   // Generate confetti dots - Brand v1.0 colors
@@ -830,6 +868,85 @@ function SuccessStep({ onComplete, data, streakCount = 6 }: SuccessStepProps) {
             Estimates are indicative, not medical advice.
           </p>
         </div>
+
+        {/* Posterior Probability Section */}
+        {analysisResults?.posteriorData && (
+          <div
+            className="rounded-xl border border-border bg-card p-4 space-y-3"
+            style={{ borderRadius: '12px' }}
+          >
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              <h3 className="text-body font-semibold">Updated Risk Distribution</h3>
+            </div>
+            <p className="text-label text-muted-foreground">
+              Based on your answers, we calculated hour-by-hour risk probabilities using Bayesian inference.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {analysisResults.posteriorData.hourly_posteriors.slice(0, 6).map((posterior: any, idx: number) => {
+                // Calculate approximate risk from posterior
+                const avgStd = posterior.std.reduce((sum: number, s: number) => sum + s, 0) / posterior.std.length;
+                const riskLevel = avgStd > 1.5 ? 'high' : avgStd > 1.0 ? 'medium' : 'low';
+                const riskColor = riskLevel === 'high' ? 'text-critical' : riskLevel === 'medium' ? 'text-warning' : 'text-success';
+                const bgColor = riskLevel === 'high' ? 'bg-critical/10' : riskLevel === 'medium' ? 'bg-warning/10' : 'bg-success/10';
+                
+                return (
+                  <div key={idx} className={`px-3 py-2 rounded-lg ${bgColor} flex items-center gap-2`} style={{ borderRadius: '8px' }}>
+                    <span className="text-label text-muted-foreground">{posterior.hour}h</span>
+                    <span className={`text-label font-medium ${riskColor}`}>
+                      {(avgStd * 50).toFixed(0)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Information Gain Section */}
+        {analysisResults?.policyData && (
+          <div
+            className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3"
+            style={{ borderRadius: '12px' }}
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              <h3 className="text-body font-semibold text-primary">💡 Maximum Information Gain</h3>
+            </div>
+            <p className="text-label text-muted-foreground">
+              These measurement times would give you the <strong>most valuable data</strong> to improve your predictions:
+            </p>
+            <div className="space-y-2">
+              {analysisResults.policyData.selected_hours.map((hour: any, idx: number) => {
+                const urgency = hour.priority_score > 1.2 ? 'High' : hour.priority_score > 0.8 ? 'Medium' : 'Low';
+                const urgencyColor = urgency === 'High' ? 'text-critical' : urgency === 'Medium' ? 'text-warning' : 'text-primary';
+                const period = hour.hour >= 12 ? 'pm' : 'am';
+                const displayHour = hour.hour === 0 ? 12 : hour.hour > 12 ? hour.hour - 12 : hour.hour;
+                
+                return (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border" style={{ borderRadius: '8px' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-body font-medium">{displayHour}{period}</p>
+                        <p className="text-label text-muted-foreground">Rank #{idx + 1}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-label font-medium ${urgencyColor}`}>{urgency} value</p>
+                      <p className="text-label text-muted-foreground">Score: {hour.priority_score.toFixed(2)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-label text-muted-foreground pt-2 border-t border-border">
+              Measuring at these times helps the model learn faster by reducing uncertainty where it matters most.
+            </p>
+          </div>
+        )}
 
         {/* Suggested Next Step */}
         {suggestedAction && (

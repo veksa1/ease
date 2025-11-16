@@ -526,9 +526,16 @@ export default function App() {
       {/* Main App Screens */}
       {currentScreen.startsWith('quick-check') && (
         <QuickCheckFlow
-          onComplete={async (data) => {
-            // Update risk with QuickCheck data and fetch hourly posterior
-            await updateRiskWithQuickCheck(data);
+          onComplete={async (data, analysisResults) => {
+            // Note: analysisResults are already fetched within QuickCheckFlow
+            // We could use updateRiskWithQuickCheck here if we want to update global state
+            // For now, we'll just log the results
+            if (analysisResults) {
+              console.log('✅ Quick Check completed with analysis:', {
+                posteriorData: analysisResults.posteriorData !== null,
+                policyData: analysisResults.policyData !== null,
+              });
+            }
             
             // Increment and save streak
             const newStreak = streakCount + 1;

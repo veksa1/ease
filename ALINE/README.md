@@ -142,6 +142,47 @@ From evaluation on synthetic data (100 users × 365 days):
 - Random Policy: Baseline comparison
 - Fixed Schedule: Query at 8am, 12pm, 8pm
 
+## 📈 Simulator Visualizations
+
+The ALINE simulator generates realistic migraine data with balanced latent variables achieving **25.8% separation** between migraine and no-migraine states:
+
+### Latent Variable Distributions
+![Latent Distributions](artifacts/simulator_viz/latent_distributions.png)
+
+Comparison of the four latent health states (stress, sleep debt, hormonal, environmental load) during migraine vs. no-migraine days.
+
+### Separation Metrics
+![Separation Metrics](artifacts/simulator_viz/separation_metrics.png)
+
+Statistical separation achieved: 25.8% average across all dimensions, with Cohen's d effect sizes of 0.252-0.264.
+
+### Temporal Evolution
+![Temporal Evolution](artifacts/simulator_viz/temporal_evolution.png)
+
+365-day time series showing how latent states evolve over time for sample users.
+
+### Correlation Analysis
+![Correlation Heatmap](artifacts/simulator_viz/correlation_heatmap.png)
+
+Side-by-side comparison of feature correlations during migraine vs. no-migraine periods.
+
+### Risk Analysis
+![Risk Scatter](artifacts/simulator_viz/risk_scatter.png)
+
+Relationship between latent states and migraine probability with trend lines.
+
+### Statistical Summary
+![Summary Table](artifacts/simulator_viz/summary_table.png)
+
+Comprehensive statistics showing separation metrics, migraine rates, and validation results.
+
+**Generate visualizations:**
+```bash
+uv run python visualize_simulator.py
+```
+
+**View interactive report:** `artifacts/simulator_viz/analysis_report.html`
+
 ## 🧪 Development
 
 ### Run Tests
