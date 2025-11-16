@@ -242,9 +242,9 @@ def train_epoch(model, dataloader, optimizer, device, config):
     total_policy_loss = 0
     total_migraine_loss = 0
     
-    # Migraine prediction weights (from simulator config)
-    migraine_weights = torch.tensor([0.5, 0.4, 0.45, 0.35], device=device)
-    migraine_bias = torch.tensor([-1.8], device=device)
+    # Migraine prediction weights (from simulator config - optimized for 365 days)
+    migraine_weights = torch.tensor([0.271, 0.237, 0.305, 0.152], device=device)
+    migraine_bias = torch.tensor([-3.0], device=device)
     
     # Progress bar for batches
     pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Training", unit="batch")
@@ -285,16 +285,31 @@ def train_epoch(model, dataloader, optimizer, device, config):
         # Backward pass
         optimizer.zero_grad()
         loss.backward()
+        
+        # Gradient clipping for stability
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
+        # Check for NaN/Inf gradients
+        if torch.isnan(loss) or torch.isinf(loss):
+            logger.error(f"NaN/Inf detected in loss at batch {batch_idx}! Skipping batch.")
+            optimizer.zero_grad()
+            continue
+        
         optimizer.step()
         
-        total_loss += loss.item()
+        # Validate loss values before accumulating
+        loss_val = loss.item()
+        if loss_val > 1e6:
+            logger.warning(f"Extremely large loss detected: {loss_val:.2e} at batch {batch_idx}")
+        
+        total_loss += loss_val
         total_post_loss += loss_post.item()
         total_policy_loss += loss_policy.item()
         total_migraine_loss += loss_migraine.item()
         
         # Update progress bar
         pbar.set_postfix({
-            'loss': f'{loss.item():.4f}',
+            'loss': f'{loss_val:.4f}',
             'post': f'{loss_post.item():.4f}',
             'policy': f'{loss_policy.item():.4f}',
             'migr': f'{loss_migraine.item():.4f}'
@@ -318,8 +333,9 @@ def validate(model, dataloader, device, config):
     all_preds = []
     all_targets = []
     
-    migraine_weights = torch.tensor([0.5, 0.4, 0.45, 0.35], device=device)
-    migraine_bias = torch.tensor([-1.8], device=device)
+    # Use same weights as training
+    migraine_weights = torch.tensor([0.271, 0.237, 0.305, 0.152], device=device)
+    migraine_bias = torch.tensor([-3.0], device=device)
     
     # Progress bar for validation
     pbar = tqdm(dataloader, desc="Validating", unit="batch", leave=False)
