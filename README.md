@@ -8,7 +8,7 @@ https://ease-chi.vercel.app
 
 Konsta Kiirikki
 Aarni Konola
-Veikko Svenyrenko
+Veikko Svynarenko
 Lauri Mäkinen
 Markus Määttänen
 
@@ -44,6 +44,8 @@ Migraine propobility vs latent variables: ![alt text](images/risk_scatter.png)
 Variable statistic summary: ![alt text](images/summary_table.png)
 Latent variable temporal evolution: ![alt text](images/temporal_evolution.png)
 Feature distribution: ![alt text](images/feature_distributions_grid.png)
+
+ALINE: https://arxiv.org/abs/2506.07259,
 
 ## Data
 
