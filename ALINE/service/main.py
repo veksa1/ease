@@ -151,8 +151,9 @@ async def lifespan(app: FastAPI):
     """Handle startup and shutdown events"""
     # Startup
     import os
-    logger.info(f"Starting ALINE service on port {os.getenv('PORT', '8000')}")
-    logger.info(f"Host: {os.getenv('HOST', '0.0.0.0')}")
+    port = os.getenv('PORT', '8080')
+    host = os.getenv('HOST', '0.0.0.0')
+    logger.info(f"Starting ALINE service on {host}:{port}")
     try:
         load_model_and_config()
         logger.info("✓ Startup completed successfully")

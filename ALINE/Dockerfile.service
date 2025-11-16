@@ -42,8 +42,9 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Health check with extended timeout for model loading
-HEALTHCHECK --interval=30s --timeout=60s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=60s --start-period=300s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Run the FastAPI service using uv to ensure correct Python environment
-CMD ["uv", "run", "python", "-m", "service.main"]
+# Run the FastAPI service
+# Cloud Run requires the app to listen on 0.0.0.0:$PORT
+CMD ["sh", "-c", "uv run python -m service.main"]

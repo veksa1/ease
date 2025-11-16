@@ -242,7 +242,7 @@ class SQLiteService {
     this.db.run(`
       CREATE TABLE IF NOT EXISTS user_trigger_hypotheses (
         id TEXT PRIMARY KEY,
-        key TEXT NOT NULL UNIQUE,
+        key TEXT NOT NULL,
         label TEXT NOT NULL,
         confidence REAL NOT NULL,
         freq_per_month REAL,
@@ -702,20 +702,6 @@ class SQLiteService {
 
     const now = new Date().toISOString();
 
-    // Check for existing hypothesis with same key to reuse id/created_at
-    const existing = this.db.exec(
-      `SELECT id, created_at FROM user_trigger_hypotheses WHERE key = ? LIMIT 1`,
-      [h.key]
-    );
-
-    let id = h.id;
-    let createdAt = now;
-
-    if (existing.length && existing[0].values.length) {
-      id = existing[0].values[0][0] as string;
-      createdAt = existing[0].values[0][1] as string;
-    }
-
     this.db.run(
       `INSERT INTO user_trigger_hypotheses 
        (id, key, label, confidence, freq_per_month, threshold, onset_window_hours, helps, notes, created_at, updated_at)
@@ -731,7 +717,7 @@ class SQLiteService {
          notes = excluded.notes,
          updated_at = excluded.updated_at`,
       [
-        id,
+        h.id,
         h.key,
         h.label,
         h.confidence,
@@ -740,7 +726,7 @@ class SQLiteService {
         h.onsetWindowHours ?? null,
         h.helps ?? null,
         h.notes ?? null,
-        createdAt,
+        now,
         now,
       ]
     );
@@ -847,7 +833,6 @@ class SQLiteService {
     await this.clearTimeline();
     await this.exec('DELETE FROM user_settings');
     await this.clearExperiments();
-    await this.exec('DELETE FROM user_trigger_hypotheses');
   }
 
   /**
