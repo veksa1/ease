@@ -19,20 +19,21 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # ---- Install project dependencies ----
 # Copy metadata first (improves cache) then copy source and required folders.
-# Avoid copying optional runtime artifacts (like specific checkpoints) which
-# may not exist at build time — mount those at runtime instead.
 COPY pyproject.toml ./
+COPY README.md ./
 COPY models/ ./models/
 COPY service/ ./service/
 COPY configs/ ./configs/
-# Copy remaining project files
-COPY . .
+COPY data/ ./data/
 
 # Install the package
 RUN pip install --no-cache-dir .
 
 # Prepare runtime dirs
 RUN mkdir -p /app/data /app/runs/checkpoints
+
+# Copy trained model checkpoint (required for predictions)
+COPY runs/checkpoints/best.pt /app/runs/checkpoints/best.pt
 
 EXPOSE 8080
 

@@ -10,7 +10,6 @@ import {
   Download,
   Trash2,
   Server,
-  Moon,
   Clock,
   Copy,
   Check,
@@ -32,9 +31,7 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScreenProps) {
-  const [lowStimMode, setLowStimMode] = useState(true);
   const [quietHours, setQuietHours] = useState(true);
-  const [lowStimWarnings, setLowStimWarnings] = useState(true);
   const [onDeviceModel, setOnDeviceModel] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareFlow, setShowShareFlow] = useState(false);
@@ -54,30 +51,7 @@ export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScr
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto pb-20">
-        {/* Low-stimulation mode - Prominent at top */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-b border-indigo-100">
-          <div className="px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <Moon className="w-5 h-5 text-[#6A67D8]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">
-                    Low-stimulation mode
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Reduce animations & visual density
-                  </div>
-                </div>
-              </div>
-              <AccessibleSwitch
-                checked={lowStimMode}
-                onCheckedChange={setLowStimMode}
-              />
-            </div>
-          </div>
-        </div>
+        {/* Low-stimulation mode removed per request */}
 
         <div className="px-4 py-4 space-y-6">
           {/* Account Section */}
@@ -209,26 +183,7 @@ export function ProfileScreen({ onBack, onNavigate, onDevicesClick }: ProfileScr
                 <ChevronRight className="w-5 h-5 text-gray-400" />
               </button>
 
-              {/* Low-stim warnings only */}
-              <div className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Moon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900">
-                        Low-stimulation warnings only
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Gentle notifications without sound
-                      </div>
-                    </div>
-                  </div>
-                  <AccessibleSwitch
-                    checked={lowStimWarnings}
-                    onCheckedChange={setLowStimWarnings}
-                  />
-                </div>
-              </div>
+              {/* Low-stimulation warnings removed per request */}
             </div>
           </section>
 

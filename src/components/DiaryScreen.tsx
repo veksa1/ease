@@ -67,16 +67,19 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
   const dayDataMap: Record<number, DayData> = {};
   
   if (!loading) {
-    calendarDays.forEach(day => {
-      dayDataMap[day.day] = {
-        day: day.day,
-        risk: day.risk,
-        hasAttack: day.hasAttack,
-        triggers: day.hasAttack ? ['Based on patterns'] : [],
+    calendarDays.forEach(calDay => {
+      // Extract actual day of month from the date string
+      const dayOfMonth = new Date(calDay.date).getDate();
+      
+      dayDataMap[dayOfMonth] = {
+        day: dayOfMonth,
+        risk: calDay.risk,
+        hasAttack: calDay.hasAttack,
+        triggers: calDay.hasAttack ? ['Based on patterns'] : [],
         sleep: 7.0, 
         hrv: 55,
         screenTime: 4.5,
-        entries: day.hasAttack ? [
+        entries: calDay.hasAttack ? [
           { time: '09:00', type: 'attack' as const, title: 'Migraine attack', details: 'Predicted event' }
         ] : []
       };
@@ -137,7 +140,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() + delta);
     setCurrentMonth(newDate);
-    setSelectedDay(null);
+    setSelectedDay(null); // Reset selected day when changing months
   };
 
   // Loading state
@@ -255,7 +258,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
             {allDays.map((day, i) => {
               const dayData = day ? mockDayData[day] : undefined;
               const isVisible = shouldShowDay(dayData);
-              const isSelected = day === selectedDay;
+              const isSelected = day === selectedDay && day !== null;
               const isToday = day === 14; // Mock today
               const hasData = dayData && (dayData.hasAttack || dayData.entries?.length || dayData.sleep || dayData.hrv);
 
@@ -268,7 +271,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                     relative aspect-square flex flex-col items-center justify-center rounded-lg
                     transition-all duration-200 min-h-[48px] md:min-h-[56px] lg:min-h-[64px]
                     text-sm md:text-base
-                    ${!day ? 'invisible' : ''}
+                    ${!day ? 'invisible pointer-events-none' : ''}
                     ${isSelected ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
                     ${!isSelected && hasData ? 'bg-primary/10 hover:bg-primary/20' : ''}
                     ${!isSelected && !hasData && day ? 'hover:bg-muted active:scale-95' : ''}
@@ -282,13 +285,24 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                     <>
                       {/* Migraine indicator - red dot in top left */}
                       {dayData?.hasAttack && (
-                        <div className="absolute top-1 left-1 w-2 h-2 md:w-2.5 md:h-2.5 bg-critical rounded-full" />
+                        <div 
+                          className="rounded-full shadow-sm"
+                          style={{ 
+                            position: 'absolute',
+                            top: '0.25rem',
+                            left: '0.25rem',
+                            width: '0.5rem',
+                            height: '0.5rem',
+                            backgroundColor: '#ff7b8a'
+                          }}
+                          aria-label="Migraine occurred" 
+                        />
                       )}
                       
                       <span className="font-medium">{day}</span>
                       
                       {/* Risk dot and attack pill */}
-                      <div className="absolute bottom-1 md:bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5 md:gap-1">
+                      <div className="absolute bottom-1 md:bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5 md:gap-1" style={{ zIndex: 10 }}>
                         {/* Risk prediction dot */}
                         {dayData?.risk && activeFilters.includes('predictions') && (
                           <div
@@ -302,6 +316,7 @@ export function DiaryScreen({ onBack, onNavigate, onExportPDF }: DiaryScreenProp
                         {dayData?.hasAttack && activeFilters.includes('attacks') && (
                           <div
                             className={`w-3 h-1.5 md:w-4 md:h-2 rounded-full ${isSelected ? 'bg-primary-foreground/60' : 'bg-critical'}`}
+                            style={{ backgroundColor: isSelected ? undefined : '#ff7b8a' }}
                             aria-label="Attack logged"
                           />
                         )}
