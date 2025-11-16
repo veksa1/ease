@@ -21,9 +21,9 @@ process_noise:
   hormonal: 0.1
   envLoad: 0.08
 migraine_model:
-  # Weights optimized for 365-day simulations with stable state transition matrix
-  # For 10-day horizons, use: [0.542, 0.474, 0.610, 0.305]
-  weights: [0.271, 0.237, 0.305, 0.152]  # [stress, sleepDebt, hormonal, envLoad]
+  # Weights reduced to achieve ~15% separation (was ~25%)
+  # Reduced from [0.271, 0.237, 0.305, 0.152] to achieve gentler separation
+  weights: [0.163, 0.142, 0.183, 0.091]  # [stress, sleepDebt, hormonal, envLoad] (~60% of original)
   bias: -3.0
 baseline_migraine_rate: 0.15
 paths:
