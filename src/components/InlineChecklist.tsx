@@ -152,43 +152,45 @@ export function InlineChecklist({ state, response, payload, error, onRetry }: In
                 {response.checklist && response.checklist.length === 0 && (
                   <p className="text-label text-muted-foreground">No personalized steps available right now.</p>
                 )}
-                {response.checklist?.map(step => {
-                  const isExpanded = expandedSteps.has(step.id);
-                  const explainer = explainersByTitle.get(step.title) ?? step.description;
-                  return (
-                    <div key={step.id} className="rounded-lg border border-border/60 bg-background">
-                      <button
-                        className="w-full flex items-center justify-between gap-3 p-3 text-left"
-                        onClick={() => toggleExpanded(step.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2
-                            className={`w-5 h-5 shrink-0 ${checked[step.id] ? 'text-success' : 'text-muted-foreground/70'}`}
-                            onClick={event => {
-                              event.stopPropagation();
-                              toggleChecked(step.id);
-                            }}
+                <div className="space-y-3">
+                  {response.checklist?.map(step => {
+                    const isExpanded = expandedSteps.has(step.id);
+                    const explainer = explainersByTitle.get(step.title) ?? step.description;
+                    return (
+                      <div key={step.id} className="rounded-lg border border-border/60 bg-background">
+                        <button
+                          className="w-full flex items-center justify-between gap-3 p-3 text-left"
+                          onClick={() => toggleExpanded(step.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2
+                              className={`w-5 h-5 shrink-0 ${checked[step.id] ? 'text-success' : 'text-muted-foreground/70'}`}
+                              onClick={event => {
+                                event.stopPropagation();
+                                toggleChecked(step.id);
+                              }}
+                            />
+                            <p className={`text-body font-medium ${checked[step.id] ? 'line-through text-muted-foreground' : ''}`}>
+                              {step.title}
+                            </p>
+                          </div>
+                          <ChevronDown
+                            className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           />
-                          <p className={`text-body font-medium ${checked[step.id] ? 'line-through text-muted-foreground' : ''}`}>
-                            {step.title}
-                          </p>
-                        </div>
-                        <ChevronDown
-                          className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                      {isExpanded && (
-                        <div className="px-4 pb-4 text-label text-muted-foreground">
-                          {explainer}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 text-label text-muted-foreground">
+                            {explainer}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {infoGain.length > 0 && (
-                <div className="rounded-lg border border-border/60 bg-background">
+                <div className="rounded-lg border border-border/60 bg-background mt-3">
                   <button
                     className="w-full flex items-center justify-between gap-3 p-3 text-left"
                     onClick={() => setInsightsOpen(open => !open)}

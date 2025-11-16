@@ -55,6 +55,8 @@ ALINE (research paper): https://arxiv.org/abs/2506.07259,
 - Weather data (pressure, rain...)
 - Manually (bmi, age...)
 
+Triggers: ![alt text](image.png) (synthetic)
+
 ## Results
 
 - No validation/test dataset available to prove the algorithm
