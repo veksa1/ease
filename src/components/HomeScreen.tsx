@@ -6,28 +6,23 @@ import {
   Activity,
   Smartphone,
   Calendar,
-  Wind,
-  Droplets,
   Sun,
   AlertCircle,
   Flame,
   HelpCircle,
+  X,
 } from 'lucide-react';
 import { RiskRing } from './RiskRing';
 import { RiskHeroCard } from './RiskHeroCard';
 import { Button } from './ui/button';
-import { TipCard } from './TipCard';
+
 import { PillChip } from './PillChip';
 import { ReportMigraineModal } from './ReportMigraineMigral';
 import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
 import { RiskVariable } from '../types';
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from './ui/carousel';
+
 import {
   Sheet,
   SheetContent,
@@ -120,23 +115,7 @@ export function HomeScreen({
 
   const ContextualIcon = contextualAction.icon;
 
-  // State for carousel dots
-  const [api, setApi] = React.useState<any>();
-  const [current, setCurrent] = React.useState(0);
-  const [count, setCount] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!api) {
-      return;
-    }
-
-    setCount(api.scrollSnapList().length);
-    setCurrent(api.selectedScrollSnap());
-
-    api.on('select', () => {
-      setCurrent(api.selectedScrollSnap());
-    });
-  }, [api]);
+  const [showPreventionFeedback, setShowPreventionFeedback] = React.useState(true);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -370,56 +349,35 @@ export function HomeScreen({
             </div>
           </div>
 
-          {/* Tips Carousel */}
-          <div className="space-y-4">
-            <h2 className="text-h2">Tips for you</h2>
-            <div className="relative">
-              <Carousel
-                setApi={setApi}
-                className="w-full"
-                opts={{
-                  align: 'start',
-                  loop: false,
-                }}
-              >
-                <CarouselContent>
-                  <CarouselItem>
-                    <TipCard
-                      icon={Wind}
-                      title="Take a breathing break"
-                      description="5 minutes of deep breathing can reduce stress and lower migraine risk."
-                      iconBgColor="bg-accent/10"
-                      iconColor="text-accent"
-                    />
-                  </CarouselItem>
-                  <CarouselItem>
-                    <TipCard
-                      icon={Droplets}
-                      title="Stay hydrated"
-                      description="Drink 250ml of water now to prevent dehydration headaches."
-                      iconBgColor="bg-success/10"
-                      iconColor="text-success"
-                    />
-                  </CarouselItem>
-                </CarouselContent>
-              </Carousel>
-              {/* Carousel Dots */}
-              <div className="flex justify-center gap-2 mt-4">
-                {Array.from({ length: count }).map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => api?.scrollTo(index)}
-                    className={`h-2 rounded-full transition-all ${
-                      index === current
-                        ? 'w-6 bg-primary'
-                        : 'w-2 bg-neutral-200 dark:bg-neutral-200/20'
-                    }`}
-                    aria-label={`Go to slide ${index + 1}`}
-                  />
-                ))}
+          {/* Prevention Plan Feedback */}
+          {showPreventionFeedback && (
+            <div className="space-y-3 p-4 rounded-xl border border-border bg-card/50">
+              <div className="flex items-start justify-between">
+                <h2 className="text-h2">How did your prevention plan work?</h2>
+                <button
+                  className="p-2 rounded-md hover:bg-secondary/60 transition-colors"
+                  aria-label="Dismiss"
+                  onClick={() => setShowPreventionFeedback(false)}
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+              <p className="text-label text-muted-foreground">
+                Triggers: Weather pressure drop + Poor sleep + Prodrome symptoms present
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button variant="secondary" className="h-11" onClick={() => setShowPreventionFeedback(false)}>
+                  Prevented
+                </Button>
+                <Button variant="secondary" className="h-11" onClick={() => setShowPreventionFeedback(false)}>
+                  Reduced
+                </Button>
+                <Button variant="secondary" className="h-11" onClick={() => setShowPreventionFeedback(false)}>
+                  No effect
+                </Button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
