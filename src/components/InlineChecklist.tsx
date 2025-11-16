@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Loader2, RefreshCcw, CalendarRange, Info, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { RefreshCcw, CalendarRange, Info, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import type { ChecklistContextPayload, ChecklistLLMResponse } from '../types/checklist';
 
@@ -18,6 +18,20 @@ export function InlineChecklist({ state, response, payload, error, onRetry }: In
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(true);
+
+  const ChecklistGeneratingSpinner = () => (
+    <div className="relative flex items-center justify-center w-12 h-12" role="status" aria-live="polite">
+      <span className="sr-only">Generating personalized steps</span>
+      <div className="absolute inset-1 rounded-full border border-primary/20 opacity-60" />
+      <div className="absolute inset-2 rounded-full border border-primary/30" />
+      <div className="absolute inset-1 rounded-full border-2 border-primary border-b-transparent border-l-transparent checklist-spinner-spin" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-10 h-10 checklist-spinner-spin">
+          <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(255,123,102,0.4)]" />
+        </div>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     setExpandedSteps(new Set());
@@ -61,9 +75,8 @@ export function InlineChecklist({ state, response, payload, error, onRetry }: In
 
   if (state === 'loading') {
     return (
-      <div className="w-full mt-4 p-4 rounded-xl border border-border/60 bg-background/70 flex items-center justify-center gap-3">
-        <Loader2 className="w-5 h-5 text-primary animate-spin" />
-        <p className="text-body text-muted-foreground">Generating personalized steps…</p>
+      <div className="w-full mt-4 p-5 rounded-xl border border-border/60 bg-background/70 flex items-center justify-center">
+        <ChecklistGeneratingSpinner />
       </div>
     );
   }
