@@ -1,4 +1,4 @@
-n_users: 10000
+n_users: 100
 horizon: 365
 train_split: 0.8
 random_seed: 42

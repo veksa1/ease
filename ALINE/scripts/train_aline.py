@@ -145,11 +145,15 @@ class MigraineDataset(Dataset):
             for user_id in tqdm(user_ids, desc="Creating sequences", unit="user"):
                 user_df = self.df[self.df['user_id'] == user_id].sort_values('day').reset_index(drop=True)
                 
+                # Need at least sequence_length + 1 rows (sequence + next day for label)
+                if len(user_df) < sequence_length + 1:
+                    continue
+                    
                 for i in range(len(user_df) - sequence_length):
-                    features = user_df.loc[i:i+sequence_length-1, feature_cols].values
-                    latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
-                    migraine_next = user_df.loc[i+sequence_length, 'migraine']
-                    migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
+                    features = user_df.iloc[i:i+sequence_length][feature_cols].values
+                    latents = user_df.iloc[i:i+sequence_length][latent_cols].values
+                    migraine_next = user_df.iloc[i+sequence_length]['migraine']
+                    migraine_prob_next = user_df.iloc[i+sequence_length]['migraine_prob']
                     
                     self.sequences.append({
                         'features': features,
