@@ -28,7 +28,12 @@ export function OnboardingPersonalDetailsStep({
   const [error, setError] = useState<string | null>(null);
 
   // Trigger hypothesis state
-  const [selectedTriggers, setSelectedTriggers] = useState<Set<TriggerKey>>(new Set());
+  const [selectedTriggers, setSelectedTriggers] = useState<Set<TriggerKey>>(() => {
+    if (initialValue?.suspectedTriggers && initialValue.suspectedTriggers.length > 0) {
+      return new Set(initialValue.suspectedTriggers as TriggerKey[]);
+    }
+    return new Set();
+  });
   const [triggerDetails, setTriggerDetails] = useState<Map<TriggerKey, Partial<TriggerHypothesis>>>(new Map());
   const [expandedTriggers, setExpandedTriggers] = useState<Set<TriggerKey>>(new Set());
 
@@ -48,16 +53,25 @@ export function OnboardingPersonalDetailsStep({
             details.set(h.key as TriggerKey, h);
           }
         });
+        if (!initialValue?.suspectedTriggers?.length && selected.size > 0) {
+          await Promise.all(hypotheses.map(h => sqliteService.deleteTriggerHypothesis(h.id)));
+          setSelectedTriggers(new Set());
+          setTriggerDetails(new Map());
+          setExpandedTriggers(new Set());
+          return;
+        }
         
-        setSelectedTriggers(selected);
-        setTriggerDetails(details);
+        if (selected.size > 0) {
+          setSelectedTriggers(selected);
+          setTriggerDetails(details);
+        }
       } catch (err) {
         console.error('Failed to load trigger hypotheses:', err);
       }
     };
     
     loadTriggerHypotheses();
-  }, []);
+  }, [initialValue]);
 
   const updateField = <K extends keyof PersonalMigraineProfile>(key: K, value: PersonalMigraineProfile[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
