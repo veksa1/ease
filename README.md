@@ -33,12 +33,13 @@ Predict, understand, and reduce migraine risk. EASE shows your risk for today, e
 
 ## Neural Network (ALINE)
 
-- The ALINE predicts the probabilities to get migraine, by using base indicators and learning personal patterns.
+- The ALINE predicts the probabilities to get migraine, by using base indicators and learning personal patterns with policy- and predictor heads.
 - The network always updates itself when new information is presented
 - Input: 35 variables (sleep, alcohol consumption, weather...)
 - Output: probability of migraine
 ### Synthetic data and latent variables
-By using prior distributions from clinical studies, we were able to fit a hidden markov model in a continuous statespace to the features. This allowed us to sample time-series evolution of the migraine probability. By having a synthetic simulator allowed us to pre-train the ALINE on our task. 
+By using prior distributions from clinical studies, we were able to fit a hidden markov model in a continuous statespace to the features. This allowed us to sample time-series evolution of the migraine probability. Having a synthetic simulator allowed us to pre-train the ALINE on our task. 
+
 Correlation matrix: ![alt text](images/correlation_heatmap.png)
 Latent variable distribution: ![alt text](images/latent_distributions.png)
 Migraine propobility vs latent variables: ![alt text](images/risk_scatter.png)
@@ -58,9 +59,10 @@ ALINE (research paper): https://arxiv.org/abs/2506.07259,
 Triggers: ![alt text](image.png) (synthetic)
 
 ## Results
-
-- No validation/test dataset available to prove the algorithm
-- Algorithm would (propobly) work in predicting a persons migrane episodes after learning the patterns of the specific person
+- ALINE generalized to the synthetic dataset. 
+- No validation/test dataset available to benchmark the algorithm.
+- By our estimates, ALINE could be personalized with ~1000 datapoints.
+- Further studies need to be conducted to demonstrate effectiviness in real-world applications.
 
 ## Team & Credits
 
