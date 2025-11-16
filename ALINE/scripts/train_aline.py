@@ -191,7 +191,7 @@ class MigraineDataset(Dataset):
         }
 
 
-def compute_posterior_loss(posterior, target_latents, lambda_sigma=0.5):
+def compute_posterior_loss(posterior, target_latents, lambda_sigma=0.1):
     """
     Posterior fit loss: MSE on mean and regularization on sigma
     
@@ -203,16 +203,16 @@ def compute_posterior_loss(posterior, target_latents, lambda_sigma=0.5):
     mu = posterior.mean
     sigma = posterior.stddev
     
-    # MSE on mean
+    # MSE on mean - normalize by the scale of latents
     loss_mu = nn.functional.mse_loss(mu, target_latents)
     
     # Regularize sigma to be small but not too small (target ~0.5)
     target_sigma = torch.ones_like(sigma) * 0.5
     loss_sigma = nn.functional.mse_loss(sigma, target_sigma)
     
-    # Clamp to prevent explosion
-    loss_mu = torch.clamp(loss_mu, max=100.0)
-    loss_sigma = torch.clamp(loss_sigma, max=10.0)
+    # Scale losses to reasonable range (MSE is ~100 naturally, scale it down)
+    # This preserves gradients while keeping loss values manageable
+    loss_mu = loss_mu / 10.0  # Scale down from ~100 to ~10
     
     return loss_mu + lambda_sigma * loss_sigma
 
@@ -300,7 +300,9 @@ def train_epoch(model, dataloader, optimizer, device, config):
         # Clamp migraine loss
         loss_migraine = torch.clamp(loss_migraine, max=10.0)
         
-        # Combined loss
+        # Combined loss with proper scaling
+        # Posterior loss is naturally ~10 after scaling in compute_posterior_loss
+        # Policy and migraine losses are in range [-10, 10]
         loss = (loss_post + 
                 config['training']['alpha_policy'] * loss_policy + 
                 config['training']['beta_migraine'] * loss_migraine)
