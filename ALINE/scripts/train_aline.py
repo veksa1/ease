@@ -145,11 +145,15 @@ class MigraineDataset(Dataset):
             for user_id in tqdm(user_ids, desc="Creating sequences", unit="user"):
                 user_df = self.df[self.df['user_id'] == user_id].sort_values('day').reset_index(drop=True)
                 
+                # Need at least sequence_length + 1 rows (sequence + next day for label)
+                if len(user_df) < sequence_length + 1:
+                    continue
+                    
                 for i in range(len(user_df) - sequence_length):
-                    features = user_df.loc[i:i+sequence_length-1, feature_cols].values
-                    latents = user_df.loc[i:i+sequence_length-1, latent_cols].values
-                    migraine_next = user_df.loc[i+sequence_length, 'migraine']
-                    migraine_prob_next = user_df.loc[i+sequence_length, 'migraine_prob']
+                    features = user_df.iloc[i:i+sequence_length][feature_cols].values
+                    latents = user_df.iloc[i:i+sequence_length][latent_cols].values
+                    migraine_next = user_df.iloc[i+sequence_length]['migraine']
+                    migraine_prob_next = user_df.iloc[i+sequence_length]['migraine_prob']
                     
                     self.sequences.append({
                         'features': features,
@@ -309,7 +313,7 @@ def train_epoch(model, dataloader, optimizer, device, config):
         
         # Check for extreme loss before backward pass
         loss_val = loss.item()
-        if torch.isnan(loss) or torch.isinf(loss) or loss_val > 1000.0:
+        if torch.isnan(loss) or torch.isinf(loss) or loss_val > 100.0:
             logger.warning(f"Extreme/invalid loss detected: {loss_val:.2e} at batch {batch_idx}. Skipping batch.")
             logger.debug(f"  posterior_loss={loss_post.item():.2e}, policy_loss={loss_policy.item():.2e}, migraine_loss={loss_migraine.item():.2e}")
             continue
