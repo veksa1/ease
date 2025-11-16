@@ -172,8 +172,8 @@ Body Temperature Change:
 
 Barometric Pressure Change:
   description: "Change in barometric pressure over 3 hours"
-  dist: exponential
-  mu_ln: 1.0  # For exponential, this is lambda parameter
+  dist: normal
+  mu: 0.0
   sigma: 3.0
   min: 0.0
   max: 20.0
@@ -200,9 +200,9 @@ Altitude:
 
 Prodrome Symptoms:
   description: "Intensity of prodrome symptoms (yawning, neck stiffness, mood changes)"
-  dist: exponential
+  dist: lognormal
   mu_ln: 0.7  # Low baseline, spikes before migraine
-  sigma: 2.5
+  sigma_ln: 0.8
   min: 0.0
   max: 10.0
 
@@ -271,8 +271,8 @@ BMI:
 
 Migraine History Years:
   description: "Years since first migraine"
-  dist: exponential
+  dist: lognormal
   mu_ln: 1.6  # exp(1.6) ≈ 5
-  sigma: 8.0
+  sigma_ln: 0.8
   min: 0.0
   max: 40.0
