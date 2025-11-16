@@ -22,6 +22,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from './ui/sheet';
+import { useWhatIfSimulator, COMMON_SCENARIOS } from '../hooks/useWhatIfSimulator';
+import { WhatIfImpactCard, WhatIfStickyFooter } from './WhatIfImpactCard';
 
 interface QuickCheckFlowProps {
   onComplete?: (data: QuickCheckData) => void;
@@ -56,6 +58,23 @@ export function QuickCheckFlow({
     food: { level: 5 },
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize what-if simulator
+  const userId = 'demo-user'; // TODO: Get from auth
+  const {
+    baselineRisk,
+    scenarios,
+    isCalculating,
+    isLoadingBaseline,
+    calculateScenarios,
+  } = useWhatIfSimulator(userId);
+
+  // Calculate what-if scenarios on mount
+  useEffect(() => {
+    if (baselineRisk !== null && !isLoadingBaseline) {
+      calculateScenarios(COMMON_SCENARIOS);
+    }
+  }, [baselineRisk, isLoadingBaseline, calculateScenarios]);
 
   // Scroll to top whenever the step changes
   useEffect(() => {
@@ -139,13 +158,15 @@ export function QuickCheckFlow({
       )}
 
       {/* Content */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20">
         {currentStep === 1 && (
           <CaffeineStep
             value={data.caffeine}
             onChange={(caffeine) => setData({ ...data, caffeine })}
             onContinue={handleContinue}
             onSkip={handleSkip}
+            baselineRisk={baselineRisk}
+            isCalculating={isCalculating}
           />
         )}
         {currentStep === 2 && (
@@ -154,6 +175,8 @@ export function QuickCheckFlow({
             onChange={(water) => setData({ ...data, water })}
             onContinue={handleContinue}
             onSkip={handleSkip}
+            baselineRisk={baselineRisk}
+            isCalculating={isCalculating}
           />
         )}
         {currentStep === 3 && (
@@ -162,12 +185,22 @@ export function QuickCheckFlow({
             onChange={(food) => setData({ ...data, food })}
             onContinue={handleContinue}
             onSkip={handleSkip}
+            baselineRisk={baselineRisk}
+            isCalculating={isCalculating}
           />
         )}
         {currentStep === 'success' && (
           <SuccessStep onComplete={handleComplete} data={data} streakCount={streakCount} />
         )}
       </div>
+      
+      {/* Sticky Footer with What-If Suggestions */}
+      {currentStep !== 'success' && (
+        <WhatIfStickyFooter
+          suggestions={scenarios}
+          isVisible={!isLoadingBaseline && scenarios.length > 0}
+        />
+      )}
     </div>
   );
 }
@@ -178,9 +211,11 @@ interface CaffeineStepProps {
   onChange: (value: QuickCheckData['caffeine']) => void;
   onContinue: () => void;
   onSkip: () => void;
+  baselineRisk: number | null;
+  isCalculating: boolean;
 }
 
-function CaffeineStep({ value, onChange, onContinue, onSkip }: CaffeineStepProps) {
+function CaffeineStep({ value, onChange, onContinue, onSkip, baselineRisk, isCalculating }: CaffeineStepProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(value.types || []);
   const [lastIntake, setLastIntake] = useState<string>(value.lastIntake || '');
@@ -239,6 +274,25 @@ function CaffeineStep({ value, onChange, onContinue, onSkip }: CaffeineStepProps
         <h2 className="text-h2">How much caffeine have you consumed today?</h2>
         <p className="text-label text-muted-foreground">Refines today's prediction</p>
       </div>
+
+      {/* Live Risk Indicator */}
+      {baselineRisk !== null && (
+        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Current risk</p>
+              <p className="text-2xl font-semibold">
+                {Math.round(baselineRisk * 100)}%
+                {isCalculating && (
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    (updating...)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Caffeine Cards */}
       <div className="space-y-3">
@@ -379,9 +433,11 @@ interface WaterStepProps {
   onChange: (value: QuickCheckData['water']) => void;
   onContinue: () => void;
   onSkip: () => void;
+  baselineRisk: number | null;
+  isCalculating: boolean;
 }
 
-function WaterStep({ value, onChange, onContinue, onSkip }: WaterStepProps) {
+function WaterStep({ value, onChange, onContinue, onSkip, baselineRisk, isCalculating }: WaterStepProps) {
   const waterOptions = [
     { id: 'none' as const, label: 'None' },
     { id: 'low' as const, label: '~250–500 ml' },
@@ -401,6 +457,25 @@ function WaterStep({ value, onChange, onContinue, onSkip }: WaterStepProps) {
         <h2 className="text-h2">How much water have you had so far?</h2>
         <p className="text-label text-muted-foreground">Refines today's prediction</p>
       </div>
+
+      {/* Live Risk Indicator */}
+      {baselineRisk !== null && (
+        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Current risk</p>
+              <p className="text-2xl font-semibold">
+                {Math.round(baselineRisk * 100)}%
+                {isCalculating && (
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    (updating...)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Segmented Control */}
       <div className="space-y-4">
@@ -450,9 +525,11 @@ interface FoodStepProps {
   onChange: (value: QuickCheckData['food']) => void;
   onContinue: () => void;
   onSkip: () => void;
+  baselineRisk: number | null;
+  isCalculating: boolean;
 }
 
-function FoodStep({ value, onChange, onContinue, onSkip }: FoodStepProps) {
+function FoodStep({ value, onChange, onContinue, onSkip, baselineRisk, isCalculating }: FoodStepProps) {
   const [showMealNote, setShowMealNote] = useState(false);
   const [mealNote, setMealNote] = useState(value.note || '');
 
@@ -473,6 +550,25 @@ function FoodStep({ value, onChange, onContinue, onSkip }: FoodStepProps) {
         <h2 className="text-h2">Have you eaten more or less than normal?</h2>
         <p className="text-label text-muted-foreground">Refines today's prediction</p>
       </div>
+
+      {/* Live Risk Indicator */}
+      {baselineRisk !== null && (
+        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Current risk</p>
+              <p className="text-2xl font-semibold">
+                {Math.round(baselineRisk * 100)}%
+                {isCalculating && (
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    (updating...)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Slider */}
       <div className="space-y-4">
