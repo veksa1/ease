@@ -44,6 +44,12 @@ export function RiskHeroCard({
   const gaugeSize = Math.max(120, Math.min(220, Math.floor(viewportWidth * 0.4)));
   const gaugeStroke = gaugeSize < 150 ? 12 : 14;
 
+  const getInfluenceLabel = (pct: number): string => {
+    if (pct >= 15) return 'High';
+    if (pct >= 5) return 'Medium';
+    return 'Low';
+  };
+
   const getInfluenceColor = (pct: number) => {
     if (pct >= 20) return 'text-black dark:text-black';
     if (pct >= 15) return 'text-black dark:text-black';
@@ -61,11 +67,9 @@ export function RiskHeroCard({
   };
 
   const getPercentageBadgeColor = (pct: number) => {
-    if (pct >= 20) return 'bg-red-500 text-black';
-    if (pct >= 15) return 'bg-orange-500 text-black';
-    if (pct >= 10) return 'bg-yellow-300 text-black';
-    if (pct >= 5) return 'bg-lime-300 text-black';
-    return 'bg-emerald-400 text-black';
+    if (pct >= 15) return 'bg-red-500 text-black';
+    if (pct >= 5) return 'bg-orange-500 text-black';
+    return 'bg-green-500 text-black';
   };
 
   const groupedContributors = riskVariables
@@ -177,8 +181,8 @@ export function RiskHeroCard({
                               className={`inline-flex items-center justify-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-md shadow-sm ${getPercentageBadgeColor(variable.percentage)}`}
                               style={{ borderRadius: '8px', minWidth: '56px' }}
                             >
-                              <span className="text-xs md:text-sm font-semibold text-black">
-                                {variable.percentage}%
+                              <span className="text-xs md:text-sm font-semibold">
+                                {getInfluenceLabel(variable.percentage)}
                               </span>
                             </span>
                           </div>
