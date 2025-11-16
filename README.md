@@ -43,6 +43,7 @@ Latent variable distribution: ![alt text](latent_distributions.png)
 Migraine propobility vs latent variables: ![alt text](risk_scatter.png)
 Variable statistic summary: ![alt text](summary_table.png)
 Latent variable temporal evolution: ![alt text](temporal_evolution.png)
+Feature distribution: ![alt text](feature_distributions_grid.png)
 
 ## Data
 
