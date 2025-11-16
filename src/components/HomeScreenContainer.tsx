@@ -19,11 +19,6 @@ interface HomeScreenContainerProps {
   onInsightsClick?: () => void;
   onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
   lowStimulationMode?: boolean;
-  onChecklistRequested?: (context: {
-    riskVariables: RiskVariable[];
-    riskPercentage: number;
-    riskLevel: 'low' | 'moderate' | 'high';
-  }) => void;
 }
 
 export function HomeScreenContainer({
@@ -31,7 +26,6 @@ export function HomeScreenContainer({
   onInsightsClick,
   onSootheModeClick,
   lowStimulationMode = false,
-  onChecklistRequested,
 }: HomeScreenContainerProps) {
   // Get live risk prediction
   const { loading, risk, bounds, isBackendConnected } = useRiskPrediction();
@@ -58,9 +52,16 @@ export function HomeScreenContainer({
     // Fetch today's timeline data
     const today = new Date().toISOString().split('T')[0];
     sqliteService.getTimelineEntries(today).then(entries => {
-      if (entries.length > 0) {
-        const data = JSON.parse(entries[0].content);
+      const rawContent = entries[0]?.content;
+      if (!rawContent) {
+        return;
+      }
+
+      try {
+        const data = JSON.parse(rawContent);
         setDbData(data);
+      } catch (error) {
+        console.warn('[HomeScreenContainer] Unable to parse timeline JSON', error);
       }
     });
   }, []);
@@ -190,11 +191,6 @@ export function HomeScreenContainer({
       onQuickCheckClick={onQuickCheckClick}
       onInsightsClick={onInsightsClick}
       onSootheModeClick={onSootheModeClick}
-      onChecklistClick={
-        onChecklistRequested
-          ? () => onChecklistRequested({ riskVariables, riskPercentage, riskLevel })
-          : undefined
-      }
       lowStimulationMode={lowStimulationMode}
     />
   );
