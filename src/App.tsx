@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Moon, Heart, Activity, MapPin, Calendar, Smartphone, Watch, Zap, Coffee, Droplets, Wind } from 'lucide-react';
 import { sqliteService } from './services/sqliteService';
 import { Button } from './components/ui/button';
@@ -42,6 +42,7 @@ export default function App() {
   });
   
   const [onboardingStep, setOnboardingStep] = useState(1);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   
   // Get risk prediction hook to update risk
   const { updateRiskWithQuickCheck } = useRiskPrediction();
@@ -118,8 +119,22 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const scrollEl = scrollContainerRef.current ?? window;
+    if ('scrollTo' in scrollEl) {
+      (scrollEl as Window | HTMLElement).scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      (scrollEl as any).scrollTop = 0;
+    }
+  }, [currentScreen]);
+
   return (
-    <div className={`min-h-screen bg-background flex flex-col ${lowStimulationMode ? 'low-stimulation' : ''}`}>
+    <div
+      ref={node => {
+        scrollContainerRef.current = node;
+      }}
+      className={`min-h-screen bg-background flex flex-col ${lowStimulationMode ? 'low-stimulation' : ''}`}
+    >
       {/* Onboarding Screens */}
       {currentScreen === 'onboarding-1' && (
         <>
