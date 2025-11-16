@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface GradientRiskGaugeProps {
   percentage: number;
@@ -19,12 +19,49 @@ export function GradientRiskGauge({
   confidence = 85,
   lowStimulationMode = false,
 }: GradientRiskGaugeProps) {
+  const [displayPercentage, setDisplayPercentage] = useState(0);
+  const animationFrameRef = useRef<number>();
+  const mountedRef = useRef(false);
+  const displayValueRef = useRef(0);
+
+  useEffect(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    const startValue = mountedRef.current ? displayValueRef.current : 0;
+    const targetValue = percentage;
+    const duration = 800;
+    const startTime = performance.now();
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = easeOutCubic(progress);
+      const nextValue = startValue + (targetValue - startValue) * eased;
+      displayValueRef.current = nextValue;
+      setDisplayPercentage(nextValue);
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    mountedRef.current = true;
+    animationFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [percentage]);
+
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percentage / 100) * circumference;
+  const offset = circumference - (displayPercentage / 100) * circumference;
 
   // Calculate dot position
-  const angle = (percentage / 100) * 360 - 90; // Start from top
+  const angle = (displayPercentage / 100) * 360 - 90; // Start from top
   const dotX = size / 2 + radius * Math.cos((angle * Math.PI) / 180);
   const dotY = size / 2 + radius * Math.sin((angle * Math.PI) / 180);
 
@@ -54,7 +91,7 @@ export function GradientRiskGauge({
   };
 
   const gradientStops = getGradientStops();
-  const gradientId = `risk-gradient-${riskLevel}-${percentage}`;
+  const gradientId = `risk-gradient-${riskLevel}-${Math.round(displayPercentage)}`;
 
   const getRiskLabelColor = () => {
     if (riskLevel === 'low') return 'text-success';
@@ -105,21 +142,13 @@ export function GradientRiskGauge({
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            className={lowStimulationMode ? '' : 'transition-all duration-200 ease-out'}
-            style={
-              lowStimulationMode
-                ? {}
-                : {
-                    animation: 'none',
-                  }
-            }
           />
         </svg>
 
         {/* End-cap dot */}
-        {percentage > 0 && (
+        {displayPercentage > 0 && (
           <div
-            className={`absolute rounded-full ${lowStimulationMode ? '' : 'transition-all duration-200 ease-out'}`}
+            className="absolute rounded-full"
             style={{
               width: `${strokeWidth + 2}px`,
               height: `${strokeWidth + 2}px`,
@@ -133,7 +162,7 @@ export function GradientRiskGauge({
 
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-display">{percentage}%</div>
+          <div className="text-display">{Math.round(displayPercentage)}%</div>
           <div className="flex items-center gap-1.5 mt-1">
             <div
               className={`w-1.5 h-1.5 rounded-full ${getRiskLabelColor()}`}
