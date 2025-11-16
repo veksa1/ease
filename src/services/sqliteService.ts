@@ -20,8 +20,13 @@ class SQLiteService {
    * Initialize SQLite database
    */
   async init(): Promise<void> {
+    if (this.db) return;
     if (this.initPromise) {
       return this.initPromise;
+    }
+
+    if (typeof indexedDB === 'undefined') {
+      throw new Error('IndexedDB is not available in this environment.');
     }
 
     this.initPromise = (async () => {
@@ -46,12 +51,17 @@ class SQLiteService {
           await this.createSchema();
         }
       } catch (error) {
+        this.db = null;
         console.error('Failed to initialize SQLite:', error);
         throw error;
       }
     })();
 
-    return this.initPromise;
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
   }
 
   /**
@@ -359,6 +369,16 @@ class SQLiteService {
       });
       return obj;
     });
+  }
+
+  /**
+   * Development helper: run arbitrary queries for debugging.
+   */
+  async debugQuery(sql: string, params?: any[]): Promise<any[]> {
+    if (!(import.meta as any)?.env?.DEV) {
+      throw new Error('debugQuery is only available in development mode.');
+    }
+    return this.query(sql, params);
   }
 
   // ==================== Timeline Operations ====================
@@ -843,3 +863,26 @@ class SQLiteService {
 
 // Export singleton instance
 export const sqliteService = new SQLiteService();
+
+declare global {
+  interface Window {
+    easeDB?: {
+      query: (sql: string, params?: any[]) => Promise<any[]>;
+      dumpMigraineReports: () => Promise<any[]>;
+    };
+  }
+}
+
+if (typeof window !== 'undefined' && (import.meta as any)?.env?.DEV) {
+  window.easeDB = {
+    query: (sql: string, params?: any[]) => sqliteService.debugQuery(sql, params),
+    dumpMigraineReports: async () => {
+      const rows = await sqliteService.debugQuery(
+        'SELECT * FROM migraine_reports ORDER BY created_at DESC'
+      );
+      console.table(rows);
+      return rows;
+    },
+  };
+  console.info('[Ease] SQLite dev helpers available via window.easeDB.*');
+}
