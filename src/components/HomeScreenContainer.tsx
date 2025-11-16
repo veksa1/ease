@@ -64,7 +64,7 @@ export function HomeScreenContainer({
       } catch (error) {
         console.warn('[HomeScreenContainer] Unable to parse timeline JSON', error);
       }
-    })();
+    });
   }, []);
 
   // Determine risk level from percentage - now using actual backend prediction
