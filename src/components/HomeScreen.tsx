@@ -6,20 +6,14 @@ import {
   Activity,
   Smartphone,
   Calendar,
-  Sun,
   AlertCircle,
   Flame,
   HelpCircle,
   X,
-  Sparkles,
 } from 'lucide-react';
-import { RiskRing } from './RiskRing';
 import { RiskHeroCard } from './RiskHeroCard';
 import { Button } from './ui/button';
-
-import { PillChip } from './PillChip';
 import { ReportMigraineModal } from './ReportMigraineMigral';
-import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
 import { SmartMeasurementCard } from './SmartMeasurementCard';
 import { TomorrowRiskBanner } from './TomorrowRiskBanner';
@@ -27,15 +21,10 @@ import { RiskVariable } from '../types';
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
 import { usePolicyRecommendations } from '../hooks/usePolicyRecommendations';
 import { useTomorrowRisk } from '../hooks/useTomorrowRisk';
-
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from './ui/sheet';
+import { InlineChecklist, type InlineChecklistState } from './InlineChecklist';
+import type { ChecklistContextPayload, ChecklistLLMResponse } from '../types/checklist';
+import { buildChecklistContextPayload } from '../utils/checklistPayloadBuilder';
+import { checklistService } from '../services/checklistService';
 
 interface RiskContributor {
   label: string;
@@ -66,7 +55,6 @@ interface HomeScreenProps {
   onQuickCheckClick?: () => void;
   onInsightsClick?: () => void;
   onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
-  onChecklistClick?: () => void;
   showNotification?: 'alert' | 'nudge' | null;
   lowStimulationMode?: boolean;
 }
@@ -85,14 +73,13 @@ export function HomeScreen({
   onQuickCheckClick,
   onInsightsClick,
   onSootheModeClick,
-  onChecklistClick,
   showNotification = null,
   lowStimulationMode = false,
 }: HomeScreenProps) {
   const [showDisclaimer, setShowDisclaimer] = React.useState(true);
   const [notificationDismissed, setNotificationDismissed] = React.useState(false);
   const [showTomorrowBanner, setShowTomorrowBanner] = React.useState(true);
-  const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
+  const { pendingFollowUps } = useFollowUpReminders();
   const { prediction: tomorrowPrediction, shouldNotify } = useTomorrowRisk('demo-user');
   const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
   const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
@@ -104,12 +91,51 @@ export function HomeScreen({
     enabled: showSmartMeasurement,
   });
 
-  const handleChecklistClick = React.useCallback(() => {
+  const [showPreventionFeedback, setShowPreventionFeedback] = React.useState(true);
+  const [checklistState, setChecklistState] = React.useState<InlineChecklistState>('idle');
+  const [checklistError, setChecklistError] = React.useState<string | null>(null);
+  const [checklistPayload, setChecklistPayload] = React.useState<ChecklistContextPayload | null>(null);
+  const [checklistResponse, setChecklistResponse] = React.useState<ChecklistLLMResponse | null>(null);
+  const checklistAbortRef = React.useRef<AbortController | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      checklistAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleChecklistClick = React.useCallback(async () => {
     setShowSmartMeasurement(true);
-    if (onChecklistClick) {
-      onChecklistClick();
+    checklistAbortRef.current?.abort();
+    const controller = new AbortController();
+    checklistAbortRef.current = controller;
+
+    setChecklistError(null);
+    setChecklistState('loading');
+    setChecklistPayload(null);
+    setChecklistResponse(null);
+
+    try {
+      const builtPayload = await buildChecklistContextPayload({
+        userId: 'demo-user',
+        riskVariables,
+        riskPercentage,
+      });
+      if (controller.signal.aborted) return;
+      setChecklistPayload(builtPayload);
+
+      const checklist = await checklistService.generateChecklist(builtPayload, controller.signal);
+      if (controller.signal.aborted) return;
+      setChecklistResponse(checklist);
+      setChecklistState('ready');
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      console.error('[HomeScreen] Failed to generate checklist', err);
+      setChecklistError(err instanceof Error ? err.message : 'Unable to generate checklist right now.');
+      setChecklistState('error');
     }
-  }, [onChecklistClick]);
+  }, [riskVariables, riskPercentage]);
+
   
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -137,8 +163,6 @@ export function HomeScreen({
   };
 
   const ContextualIcon = contextualAction.icon;
-
-  const [showPreventionFeedback, setShowPreventionFeedback] = React.useState(true);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -202,15 +226,6 @@ export function HomeScreen({
             lowStimulationMode={lowStimulationMode}
           />
 
-          {/* Primary CTA - Take it easy */}
-          <Button
-            onClick={() => onSootheModeClick && onSootheModeClick(riskVariables, riskPercentage)}
-            className="w-full h-12 gap-2"
-            style={{ borderRadius: '12px' }}
-          >
-            <span className="truncate">{contextualAction.label}</span>
-          </Button>
-
           {/* Secondary Actions */}
           <div className="grid grid-cols-2 gap-3">
             {/* Report Migraine */}
@@ -245,31 +260,32 @@ export function HomeScreen({
             </Button>
           </div>
 
-          {onChecklistClick && (
-            <div
-              className="p-5 rounded-xl border border-border bg-linear-to-r from-primary/10 via-accent/10 to-background"
-              style={{ borderRadius: '16px' }}
+          {/* AI Checklist Section */}
+          <div className="space-y-3">
+            <Button
+              onClick={handleChecklistClick}
+              className="w-full h-12 gap-2"
+              style={{ borderRadius: '12px' }}
+              disabled={checklistState === 'loading'}
             >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-body font-medium">Need a plan for the next few hours?</p>
-                  <p className="text-label text-muted-foreground">
-                    Let GPT-4o assemble steps from your latest data, calendar load, and streak.
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={handleChecklistClick}
-                className="w-full h-11 mt-4"
-                style={{ borderRadius: '12px' }}
-              >
-                Generate AI checklist
-              </Button>
-            </div>
-          )}
+              {checklistState === 'loading' ? (
+                'Generating personalized steps…'
+              ) : (
+                <>
+                  <ContextualIcon className="w-4 h-4" />
+                  {checklistState === 'ready' ? 'Regenerate AI checklist' : 'Generate AI checklist'}
+                </>
+              )}
+            </Button>
+
+            <InlineChecklist
+              state={checklistState}
+              response={checklistResponse}
+              payload={checklistPayload}
+              error={checklistError}
+              onRetry={handleChecklistClick}
+            />
+          </div>
 
           {/* Today at a Glance */}
           <div

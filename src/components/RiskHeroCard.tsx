@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { HelpCircle, ArrowLeft } from 'lucide-react';
 import { GradientRiskGauge } from './GradientRiskGauge';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './ui/accordion';
@@ -20,6 +20,7 @@ interface RiskHeroCardProps {
   riskVariables?: RiskVariable[];
   whatHelps?: string[];
   lowStimulationMode?: boolean;
+  checklistSection?: ReactNode;
 }
 
 export function RiskHeroCard({
@@ -29,6 +30,7 @@ export function RiskHeroCard({
   riskVariables = [],
   whatHelps = [],
   lowStimulationMode = false,
+  checklistSection,
 }: RiskHeroCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(
@@ -132,11 +134,13 @@ export function RiskHeroCard({
           <HelpCircle className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" />
           Why?
         </button>
+
+        {checklistSection}
       </div>
 
       {showDetails && (
         <div className="fixed inset-0 z-50 bg-background text-foreground flex flex-col">
-          <div className="flex-shrink-0 border-b border-border/60 bg-background/80 backdrop-blur">
+          <div className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur">
             <div className="mx-auto max-w-5xl h-12 md:h-14 px-2 md:px-3 flex items-center">
               <button
                 onClick={() => setShowDetails(false)}
@@ -170,7 +174,7 @@ export function RiskHeroCard({
                             className={`flex items-center justify-center gap-2 md:gap-2.5 p-2 md:p-2.5 rounded-lg border border-border/40 transition-colors ${getInfluenceBackground(variable.percentage)}`}
                             style={{ borderRadius: '10px' }}
                           >
-                            <div className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-md bg-card/80 shadow-sm flex-shrink-0">
+                            <div className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-md bg-card/80 shadow-sm shrink-0">
                               <HelpCircle className="w-4 h-4 text-muted-foreground" />
                             </div>
                             <span className="text-sm md:text-base font-medium whitespace-nowrap text-foreground">{variable.name}</span>

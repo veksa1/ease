@@ -101,6 +101,7 @@ export interface ChecklistStep {
   category: 'immediate' | 'environment' | 'self-care' | 'prevention';
   timing: 'now' | 'next-hour' | 'later-today' | 'tonight';
   effort: 'low' | 'medium' | 'high';
+  tags?: string[];
 }
 
 export interface ChecklistLLMResponse {

@@ -21,17 +21,10 @@ import { useRiskPrediction } from './hooks/useDemoData';
 import { RiskVariable } from './types';
 import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDetailsStep';
 import type { PersonalMigraineProfile } from './types';
-import { ChecklistPanel } from './components/ChecklistPanel';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
   const [sootheModeData, setSootheModeData] = useState<{ riskVariables: RiskVariable[], riskPercentage: number } | null>(null);
-  const [checklistContext, setChecklistContext] = useState<{
-    riskVariables: RiskVariable[];
-    riskPercentage: number;
-    riskLevel: 'low' | 'moderate' | 'high';
-  } | null>(null);
-  const [showChecklistPanel, setShowChecklistPanel] = useState(false);
   
   // Check if user has seen onboarding
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
@@ -597,10 +590,6 @@ export default function App() {
               setCurrentScreen('soothe-mode');
             }}
             lowStimulationMode={lowStimulationMode}
-            onChecklistRequested={(context) => {
-              setChecklistContext(context);
-              setShowChecklistPanel(true);
-            }}
           />
           <BottomNav
             activeTab="home"
@@ -619,28 +608,12 @@ export default function App() {
               setCurrentScreen('soothe-mode');
             }}
             lowStimulationMode={true}
-            onChecklistRequested={(context) => {
-              setChecklistContext(context);
-              setShowChecklistPanel(true);
-            }}
           />
           <BottomNav
             activeTab="home"
             onNavigate={(tab) => setCurrentScreen(tab)}
           />
         </>
-      )}
-
-      {showChecklistPanel && checklistContext && (
-        <ChecklistPanel
-          riskVariables={checklistContext.riskVariables}
-          riskPercentage={checklistContext.riskPercentage}
-          riskLevel={checklistContext.riskLevel}
-          onClose={() => {
-            setShowChecklistPanel(false);
-            setChecklistContext(null);
-          }}
-        />
       )}
     </div>
   );

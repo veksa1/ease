@@ -2041,6 +2041,22 @@
   }
 }
 
+.checklist-spinner-spin {
+  animation: checklist-spin 1.2s linear infinite;
+}
+
+@keyframes checklist-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checklist-spinner-spin {
+    animation: none;
+  }
+}
+
 
 :root {
   --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
