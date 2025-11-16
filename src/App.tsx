@@ -23,8 +23,8 @@ import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDe
 import { DevSkipButton } from './components/DevSkipButton';
 import type { PersonalMigraineProfile } from './types';
 
-declare const __APP_ENV__: string; // or rely on existing env typing if present
-const isDev = (import.meta as any).env?.MODE === 'development' || __APP_ENV__ === 'development';
+// Remove custom __APP_ENV__ and rely on Vite env
+const isDev = import.meta.env.MODE === 'development';
 
 export type CurrentScreen =
   | 'onboarding-1'
