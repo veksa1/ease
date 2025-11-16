@@ -1,401 +1,66 @@
+# EASE — Migraine Risk & Guidance (Junction 2025) by Prae Electus
 
-  # Mobile Design System - React Frontend
+## Live demo link
 
-A modern React frontend application built with Vite, TypeScript, and Radix UI components, fully containerized with Docker for easy deployment.
+https://ease-chi.vercel.app
 
-This is a code bundle for Mobile Design System. The original project is available at https://www.figma.com/design/YetTrsLZ1bdgQI2wvgVZAs/Mobile-Design-System.
+## Team members
 
-## 🚀 Quick Start
+Konsta Kiirikki
+Aarni Konola
+Veikko Svenyrenko
+Lauri Mäkinen
+Markus Määttänen
 
-### Development (Local)
+## Vision
 
-1. **Install dependencies:**
-```bash
-npm install
-```
+Predict, understand, and reduce migraine risk. EASE shows your risk for today, explains why, and guides actions that help.
 
-2. **Start development server:**
-```bash
-npm run dev
-```
+## Quick Start
 
-3. **Open your browser:** `http://localhost:5173`
+- Local: `npm install` → `npm run dev` → open `http://localhost:3000`
+- Docker: `npm run docker:dev` → open `http://localhost:3000`
+- Windows tip: portable Node is bundled; if npm isn’t found, run npm with `--prefix "ease"` from the workspace root.
 
-### Development (Docker)
+## Key Features
 
-1. **Copy environment file:**
-```bash
-cp .env.example .env
-```
+- Risk gauge
+- Migrane self reportation
+- Quick check
+- personized checklist to prevent migraine
+- Diary and calender to know how to prepare for the future
+- Historic trigger combinations for migraine
 
-2. **Start with Docker Compose:**
-```bash
-npm run docker:dev
-```
+## Neural Network (ALINE)
 
-3. **Access your app:** `http://localhost:3000`
+- The ALINE neural network predicts the propobilities to get migrane, by using base indicators and learning personal patterns
+- The network always updates itself when new information is presented
+- Input: 35 variables (sleep, alcohol consumption, weather...)
+- Output: propobility of migraine
 
-## 🐳 Docker Commands
+Correlation matrix: ![alt text](correlation_heatmap.png)
+Latent variable distribution: ![alt text](latent_distributions.png)
+Migraine propobility vs latent variables: ![alt text](risk_scatter.png)
+Variable statistic summary: ![alt text](summary_table.png)
+Latent variable temporal evolution: ![alt text](temporal_evolution.png)
 
-| Command | Description |
-|---------|-------------|
-| `npm run docker:build` | Build Docker image |
-| `npm run docker:run` | Run container in detached mode |
-| `npm run docker:dev` | Start development environment |
-| `npm run docker:prod` | Start production environment |
-| `npm run docker:stop` | Stop all containers |
-| `npm run docker:logs` | View container logs |
+## Data
 
-## 📁 Project Structure
+- Susan calendar source: `ALINE/personal_data/susan_data.json` (synthetic)
+- Biometics (sleep, screen time...) (synthetic)
+- Weather data (pressure, rain...)
+- Manually (bmi, age...)
 
-```
-src/
-├── components/          # React components
-│   ├── ui/             # Reusable UI components (Radix UI based)
-│   └── figma/          # Figma-specific components
-├── styles/             # CSS and styling
-├── utils/              # Utility functions
-│   ├── api.ts          # API client for backend communication
-│   └── env.ts          # Environment configuration
-└── main.tsx           # Application entry point
-```
+## Results
 
-## 🌍 Environment Variables
+- No validation/test dataset available to prove the algorithm
+- Algorithm would (propobly) work in predicting a persons migrane episodes after learning the patterns of the specific person
 
-Create a `.env` file from `.env.example`:
+## Team & Credits
 
-```env
-# API Configuration
-REACT_APP_API_URL=http://localhost:8000
-REACT_APP_ENVIRONMENT=development
+- Team Prae Electus with product EASE. Built on the ALINE algorithm and open UI primitives.
 
-# Docker Configuration
-BACKEND_URL=http://backend:8000
-```
+## Visual
 
-For production:
-```env
-REACT_APP_API_URL=https://api.yourdomain.com
-REACT_APP_ENVIRONMENT=production
-```
-
-## 🔗 Backend Integration
-
-The app includes utilities for easy backend communication:
-
-```typescript
-import { apiClient } from './utils/api';
-
-// GET request
-const { data, error } = await apiClient.get('/users');
-
-// POST request
-const { data, error } = await apiClient.post('/users', { name: 'John' });
-```
-
-## 🏭 Production Deployment
-
-### Option 1: Docker with Traefik (Recommended)
-
-1. **Set up your server** (see `DEPLOYMENT.md` for detailed instructions)
-
-2. **Configure environment variables:**
-```bash
-cp .env.example .env
-# Edit .env with your production values
-```
-
-3. **Deploy with SSL:**
-```bash
-npm run docker:prod
-```
-
-This automatically:
-- ✅ Sets up SSL certificates with Let's Encrypt
-- ✅ Configures reverse proxy
-- ✅ Enables automatic renewals
-- ✅ Optimizes for production
-
-### Option 2: Manual Docker Deployment
-
-```bash
-# Build and run manually
-docker build -t ease3-frontend .
-docker run -d -p 3000:3000 \
-  -e REACT_APP_API_URL=https://api.yourdomain.com \
-  -e REACT_APP_ENVIRONMENT=production \
-  ease3-frontend
-```
-
-## 🔧 Domain Configuration (GoDaddy)
-
-1. **Add A Record:**
-   - Type: `A`
-   - Name: `@`
-   - Value: `YOUR_SERVER_IP`
-
-2. **Add CNAME for www:**
-   - Type: `CNAME`
-   - Name: `www`
-   - Value: `yourdomain.com`
-
-## 📊 Features
-
-- ✅ **Modern Stack:** React 18, TypeScript, Vite
-- ✅ **UI Components:** Radix UI with custom styling
-- ✅ **Containerized:** Docker with multi-stage builds
-- ✅ **SSL Ready:** Automatic HTTPS with Let's Encrypt
-- ✅ **Environment Variables:** Runtime configuration support
-- ✅ **API Ready:** Built-in API client utilities
-- ✅ **Production Optimized:** Gzip, caching, security headers
-
-## 🛠️ Development
-
-### Adding New Components
-
-1. Create in `src/components/`
-2. Follow the existing pattern with TypeScript interfaces
-3. Use Radix UI components from `src/components/ui/`
-
-### API Integration
-
-```typescript
-// utils/api.ts provides a configured client
-import { apiClient } from '../utils/api';
-
-const MyComponent = () => {
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await apiClient.get('/api/data');
-      if (response.data) {
-        setData(response.data);
-      }
-    };
-    fetchData();
-  }, []);
-};
-```
-
-### Environment Configuration
-
-```typescript
-// utils/env.ts provides environment utilities
-import { ENV, getApiUrl, isProduction } from '../utils/env';
-
-// Get API URL for any endpoint
-const apiUrl = getApiUrl('/users'); // https://api.yourdomain.com/users
-
-// Check environment
-if (isProduction()) {
-  // Production-specific code
-}
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Port 3000 already in use:**
-```bash
-lsof -ti:3000 | xargs kill -9
-```
-
-2. **Docker build failures:**
-```bash
-docker system prune -a
-npm run docker:build
-```
-
-3. **Environment variables not updating:**
-```bash
-npm run docker:stop
-npm run docker:dev
-```
-
-### Logs
-
-```bash
-# View all logs
-npm run docker:logs
-
-# View specific service logs
-docker-compose logs -f frontend
-```
-
-## 📚 Additional Documentation
-
-- [`DEPLOYMENT.md`](./DEPLOYMENT.md) - Comprehensive deployment guide
-- [Radix UI Documentation](https://www.radix-ui.com/) - UI component library
-- [Vite Documentation](https://vitejs.dev/) - Build tool
-
----
-
-**Need help?** Check the `DEPLOYMENT.md` file for detailed server setup and deployment instructions.
-  
-## Local Development
-
-```bash
-npm install
-npm run dev
-```
-
-Visit `http://localhost:3000`
-
-## Building
-
-```bash
-npm run build
-npm run preview
-```
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push to GitHub
-2. Import project in [Vercel](https://vercel.com)
-3. Framework: Vite
-4. Build command: `npm run build`
-5. Output directory: `build`
-6. Deploy!
-
-Environment variables:
-- `VITE_DEMO_MODE=true`
-- `VITE_ENVIRONMENT=production`
-
-### Manual Deployment
-
-```bash
-npm run build
-# Upload build/ directory to your hosting service
-```
-
-## Demo Data
-
-Demo data is pre-generated using the ALINE ML model:
-
-```bash
-cd ALINE
-python scripts/create_demo_dataset.py
-```
-
-This generates `src/data/demoUserAlex.json` (131 KB) with:
-- 30 days × 24 hours = 720 hourly predictions
-- 6 migraine events with realistic triggers
-- 4 correlation insights
-- Calendar data
-
-## Architecture
-
-```
-src/
-├── components/        # React components
-│   ├── HomeScreenContainer.tsx  # Live risk display
-│   ├── DiaryScreen.tsx          # Calendar with predictions
-│   ├── InsightsScreen.tsx       # Correlations & experiments
-│   └── QuickCheckFlow.tsx       # User input flow
-├── hooks/            # React hooks
-│   └── useDemoData.ts          # Data access hooks
-├── services/         # Business logic
-│   ├── demoDataService.ts      # Data singleton
-│   └── featureConverter.ts     # QuickCheck → risk
-├── types/            # TypeScript types
-│   └── aline.ts               # Demo data types
-└── data/             # Static data
-    └── demoUserAlex.json      # Pre-computed predictions
-```
-
-## Features
-
-### Real-Time Risk Prediction
-
-- Risk percentage updates from demo data
-- QuickCheck adjusts risk based on caffeine, water, food
-- Confidence bounds (5th-95th percentile)
-- Loading states with smooth animations
-
-### Interactive Calendar
-
-- 30 days of predictions visualized
-- Color-coded risk levels (low/medium/high)
-- Migraine events marked
-- Filter by predictions, attacks, triggers
-- Month navigation (October-November 2025)
-
-### Insights & Correlations
-
-- 4 correlation insights from ML analysis
-- Experiment tracking with localStorage
-- Pattern chip showing top triggers
-- Narrative insights generation
-
-### Persistence
-
-All user actions persist to localStorage:
-- `ease_streak_count` - QuickCheck streak
-- `ease_user_timeline` - Check-ins and reports
-- `ease_experiment_hydration` - Experiment progress
-- `ease_has_seen_onboarding` - Onboarding skip
-
-## Reset Demo
-
-Click the reset button (bottom-right) to clear all localStorage and restart.
-
-## License
-
-Proprietary - EASE Team 2025
-
----
-
-## 🚀 EASE Demo - Tickets 013-018
-
-### Demo User "Alex"
-- **Period**: October 16 - November 14, 2025 (30 days)
-- **Migraine events**: 6 realistic attacks with triggers
-- **Average risk**: 15.1%
-- **Data file**: `src/data/demoUserAlex.json` (131 KB)
-
-### Features Implemented
-
-✅ **Live Risk Predictions** - HomeScreen shows real-time risk from ALINE ML model  
-✅ **Interactive QuickCheck** - Updates risk based on caffeine, water, food inputs  
-✅ **Calendar Integration** - DiaryScreen displays 30 days with color-coded risk  
-✅ **Insights & Correlations** - Real correlation data from ML analysis  
-✅ **localStorage Persistence** - Streak, timeline, experiments saved locally  
-✅ **Demo Reset** - Button to clear all data and restart  
-✅ **Optimized Build** - Code splitting: React (142KB) + Radix (50KB) + App (344KB)
-
-### Deployment to Vercel
-
-```bash
-# 1. Install Vercel CLI
-npm i -g vercel
-
-# 2. Deploy
-vercel --prod
-```
-
-Or use GitHub integration:
-1. Push to GitHub
-2. Import in Vercel dashboard
-3. Framework: Vite
-4. Build: `npm run build`
-5. Output: `build`
-
-### Environment Variables
-
-Set in Vercel dashboard or `.env.production`:
-- `VITE_DEMO_MODE=true`
-- `VITE_ENVIRONMENT=production`
-
-### Regenerate Demo Data
-
-```bash
-cd ALINE
-python scripts/create_demo_dataset.py
-```
-
-Outputs: `src/data/demoUserAlex.json`
-
----
-
+main page: ![alt text](image-2.png)
+personalized plan: ![alt text](image-3.png)
