@@ -45,10 +45,22 @@ export function HomeScreenContainer({
   // Get streak count from SQLite
   const [streakCount, setStreakCount] = useState(7);
   
+  // Get today's data from database
+  const [dbData, setDbData] = useState<any>(null);
+  
   useEffect(() => {
     sqliteService.getSetting('streak_count').then(value => {
       if (value) {
         setStreakCount(parseInt(value, 10));
+      }
+    });
+    
+    // Fetch today's timeline data
+    const today = new Date().toISOString().split('T')[0];
+    sqliteService.getTimelineEntries(today).then(entries => {
+      if (entries.length > 0) {
+        const data = JSON.parse(entries[0].content);
+        setDbData(data);
       }
     });
   }, []);
@@ -101,8 +113,38 @@ export function HomeScreenContainer({
 
   const whatHelps = ['Stay active', 'Maintain routine', 'Monitor triggers'];
 
-  // Comprehensive risk variables combining hardcoded environmental/biometric/lifestyle + personal profile from DB
-  const riskVariables: RiskVariable[] = [
+  // Comprehensive risk variables combining database values + personal profile from DB
+  const riskVariables: RiskVariable[] = dbData ? [
+    // Environmental factors from database
+    { name: 'Barometric Pressure Change', percentage: 28, category: 'environmental', value: dbData.barometric_pressure_change || '-6', unit: 'hPa' },
+    { name: 'Weather Changes', percentage: 14, category: 'environmental', value: 'Unstable', unit: '' },
+    { name: 'Humidity', percentage: 11, category: 'environmental', value: dbData.humidity || '75', unit: '%' },
+    { name: 'Temperature', percentage: 9, category: 'environmental', value: dbData.temperature || '22', unit: '°C' },
+    { name: 'Air Quality Index', percentage: 6, category: 'environmental', value: dbData.air_quality_index || '85', unit: 'AQI' },
+    { name: 'Base Pressure', percentage: 5, category: 'environmental', value: dbData.base_pressure || '1013', unit: 'hPa' },
+    { name: 'Altitude', percentage: 3, category: 'environmental', value: dbData.altitude || '850', unit: 'm' },
+    
+    // Biometric factors from database
+    { name: 'Sleep Quality', percentage: 22, category: 'biometric', value: dbData.sleep_quality ? dbData.sleep_quality.toFixed(1) : '4.5', unit: '/10' },
+    { name: 'Sleep Duration', percentage: 15, category: 'biometric', value: dbData.sleep_duration_hours ? dbData.sleep_duration_hours.toFixed(1) : '6.5', unit: 'hrs' },
+    { name: 'HRV', percentage: 12, category: 'biometric', value: dbData.hrv || '47', unit: 'ms' },
+    { name: 'Resting Heart Rate', percentage: 10, category: 'biometric', value: dbData.resting_heart_rate || '72', unit: 'bpm' },
+    { name: 'Body temperature change', percentage: 8, category: 'biometric', value: dbData.body_temperature_change ? `+${dbData.body_temperature_change.toFixed(1)}` : '+0.4', unit: '°C' },
+    { name: 'Activity Level', percentage: 7, category: 'biometric', value: dbData.activity_level || '3200', unit: 'steps' },
+    
+    // Lifestyle factors from database
+    { name: 'Prodrome Symptoms', percentage: 20, category: 'lifestyle', value: dbData.prodrome_symptoms ? 'Present' : 'Absent', unit: '' },
+    { name: 'Stress Level', percentage: 18, category: 'lifestyle', value: dbData.stress_level ? dbData.stress_level.toFixed(1) : '8.5', unit: '/10' },
+    { name: 'Screen Time', percentage: 8, category: 'lifestyle', value: dbData.screen_time_hours || '9', unit: 'hrs' },
+    { name: 'Meal Regularity', percentage: 7, category: 'lifestyle', value: dbData.meal_regularity ? (dbData.meal_regularity < 0.7 ? 'Irregular' : 'Regular') : 'Irregular', unit: '' },
+    { name: 'Caffeine Intake change', percentage: 6, category: 'lifestyle', value: dbData.caffeine_intake_change ? `+${dbData.caffeine_intake_change * 100}` : '+150', unit: 'mg' },
+    { name: 'Alcohol Intake', percentage: 5, category: 'lifestyle', value: dbData.alcohol_intake || '1', unit: 'drink' },
+    { name: 'Water Intake', percentage: 16, category: 'lifestyle', value: dbData.water_intake ? (dbData.water_intake / 1000).toFixed(1) : '1.8', unit: 'L' },
+    
+    // Personal factors from database
+    ...profileToRiskVariables(profile),
+  ] : [
+    // Fallback to hardcoded values if no database data
     // Environmental factors (hardcoded)
     { name: 'Barometric Pressure Change', percentage: 28, category: 'environmental', value: '-6', unit: 'hPa' },
     { name: 'Weather Changes', percentage: 14, category: 'environmental', value: 'Unstable', unit: '' },
@@ -127,7 +169,7 @@ export function HomeScreenContainer({
     { name: 'Meal Regularity', percentage: 7, category: 'lifestyle', value: 'Irregular', unit: '' },
     { name: 'Caffeine Intake change', percentage: 6, category: 'lifestyle', value: '+150', unit: 'mg' },
     { name: 'Alcohol Intake', percentage: 5, category: 'lifestyle', value: '1', unit: 'drink' },
-    { name: 'Water Intake', percentage: 4, category: 'lifestyle', value: '1.8', unit: 'L' },
+    { name: 'Water Intake', percentage: 16, category: 'lifestyle', value: '1.8', unit: 'L' },
     
     // Personal factors from database
     ...profileToRiskVariables(profile),
