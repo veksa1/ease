@@ -20,6 +20,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # ---- Install project dependencies ----
 # Copy metadata first (improves cache) then copy source and required folders.
 COPY pyproject.toml ./
+COPY README.md ./
 COPY models/ ./models/
 COPY service/ ./service/
 COPY configs/ ./configs/
