@@ -22,9 +22,11 @@ import { ReportMigraineModal } from './ReportMigraineMigral';
 import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
 import { SmartMeasurementCard } from './SmartMeasurementCard';
+import { TomorrowRiskBanner } from './TomorrowRiskBanner';
 import { RiskVariable } from '../types';
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
 import { usePolicyRecommendations } from '../hooks/usePolicyRecommendations';
+import { useTomorrowRisk } from '../hooks/useTomorrowRisk';
 import {
   Carousel,
   CarouselContent,
@@ -91,7 +93,9 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [showDisclaimer, setShowDisclaimer] = React.useState(true);
   const [notificationDismissed, setNotificationDismissed] = React.useState(false);
+  const [showTomorrowBanner, setShowTomorrowBanner] = React.useState(true);
   const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
+  const { prediction: tomorrowPrediction, shouldNotify } = useTomorrowRisk('demo-user');
   const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
   const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
   
@@ -195,6 +199,14 @@ export function HomeScreen({
                   : undefined
               }
               onDismiss={() => setNotificationDismissed(true)}
+            />
+          )}
+
+          {/* Tomorrow Risk Banner */}
+          {showTomorrowBanner && shouldNotify && tomorrowPrediction && (
+            <TomorrowRiskBanner
+              prediction={tomorrowPrediction}
+              onDismiss={() => setShowTomorrowBanner(false)}
             />
           )}
 
