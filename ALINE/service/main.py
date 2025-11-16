@@ -41,7 +41,12 @@ from service.schemas import (
     CalendarConnectionResponse,
     CalendarStatusResponse,
     ContextGenerationRequest,
-    ContextGenerationResponse
+    ContextGenerationResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    AccuracyResponse,
+    FeedbackHistoryItem,
+    FeedbackHistoryResponse
 )
 from service.database import db
 from service.calendar import calendar_service
@@ -613,6 +618,140 @@ async def get_weather_forecast(lat: float, lon: float, hours: int = 24):
     except Exception as e:
         logger.error(f"Error fetching forecast: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch forecast: {str(e)}")
+
+
+# ============================================================================
+# FEEDBACK ENDPOINTS (Ticket 026)
+# ============================================================================
+
+@app.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(request: FeedbackRequest):
+    """
+    Submit migraine outcome feedback.
+    
+    Args:
+        request: FeedbackRequest with user_id, date, had_migraine, severity, notes
+    
+    Returns:
+        FeedbackResponse with success, message, updated_accuracy, num_feedback_points
+    
+    Example:
+        POST /feedback
+        {
+            "user_id": "user123",
+            "date": "2025-11-15",
+            "had_migraine": true,
+            "severity": 7
+        }
+    """
+    try:
+        # TODO: Retrieve prediction for that date if exists
+        predicted_prob = None  # Would query from prediction history
+        
+        # Store feedback
+        feedback_id = db.add_feedback(
+            user_id=request.user_id,
+            date=request.date,
+            had_migraine=request.had_migraine,
+            severity=request.severity,
+            predicted_prob=predicted_prob,
+            notes=request.notes
+        )
+        
+        # Get user's updated accuracy
+        accuracy_stats = db.get_user_accuracy(request.user_id)
+        
+        logger.info(f"Feedback submitted for user {request.user_id}: {feedback_id}")
+        
+        return FeedbackResponse(
+            success=True,
+            message="Feedback recorded. Your model will improve with more data!",
+            updated_accuracy=accuracy_stats['accuracy'],
+            num_feedback_points=accuracy_stats['num_predictions']
+        )
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
+
+
+@app.get("/user/{user_id}/accuracy", response_model=AccuracyResponse)
+async def get_user_accuracy(user_id: str, window_days: int = 30):
+    """
+    Get user's prediction accuracy over recent window.
+    
+    Args:
+        user_id: User identifier
+        window_days: Number of days to look back (default: 30)
+    
+    Returns:
+        AccuracyResponse with accuracy, num_predictions, window_days, confidence
+    
+    Example:
+        GET /user/user123/accuracy?window_days=30
+    """
+    try:
+        stats = db.get_user_accuracy(user_id, window_days)
+        
+        # Determine confidence based on sample size
+        num_predictions = stats['num_predictions']
+        if num_predictions < 10:
+            confidence = "low"
+        elif num_predictions < 30:
+            confidence = "medium"
+        else:
+            confidence = "high"
+        
+        return AccuracyResponse(
+            accuracy=stats['accuracy'],
+            num_predictions=num_predictions,
+            window_days=window_days,
+            confidence=confidence
+        )
+    except Exception as e:
+        logger.error(f"Error getting user accuracy: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user accuracy: {str(e)}")
+
+
+@app.get("/user/{user_id}/feedback_history", response_model=FeedbackHistoryResponse)
+async def get_feedback_history(user_id: str, limit: int = 30):
+    """
+    Get user's feedback history with predictions vs. outcomes.
+    
+    Args:
+        user_id: User identifier
+        limit: Maximum number of records to return (default: 30)
+    
+    Returns:
+        FeedbackHistoryResponse with list of feedback items
+    
+    Example:
+        GET /user/user123/feedback_history?limit=30
+    """
+    try:
+        history = db.get_user_feedback_history(user_id, limit)
+        
+        formatted_history = []
+        for record in history:
+            predicted_risk = record.get('predicted_risk')
+            actual_outcome = bool(record['actual_outcome'])
+            
+            # Determine if prediction was correct
+            correct = None
+            if predicted_risk is not None:
+                correct = (predicted_risk > 0.5) == actual_outcome
+            
+            formatted_history.append(FeedbackHistoryItem(
+                feedback_date=record['feedback_date'],
+                predicted_risk=predicted_risk,
+                actual_outcome=actual_outcome,
+                severity=record.get('severity'),
+                correct=correct
+            ))
+        
+        return FeedbackHistoryResponse(history=formatted_history)
+    except Exception as e:
+        logger.error(f"Error getting feedback history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get feedback history: {str(e)}")
 
 
 if __name__ == "__main__":

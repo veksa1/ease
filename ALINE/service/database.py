@@ -36,6 +36,7 @@ class Database:
     def _init_schema(self):
         """Initialize database schema"""
         with sqlite3.connect(self.db_path) as conn:
+            # Calendar connections table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_calendar_connections (
                     id TEXT PRIMARY KEY,
@@ -48,6 +49,32 @@ class Database:
                     UNIQUE(userId)
                 )
             """)
+            
+            # Feedback tables (Ticket 026)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    feedback_date TEXT NOT NULL,
+                    predicted_risk REAL,
+                    actual_outcome INTEGER NOT NULL,
+                    severity INTEGER,
+                    timestamp INTEGER NOT NULL,
+                    notes TEXT,
+                    UNIQUE(user_id, feedback_date)
+                )
+            """)
+            
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_feedback 
+                ON user_feedback(user_id, feedback_date)
+            """)
+            
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_timestamp 
+                ON user_feedback(timestamp)
+            """)
+            
             conn.commit()
             logger.info("Database schema initialized")
     
@@ -176,6 +203,117 @@ class Database:
             logger.info(f"Deleted calendar connection for user {user_id}")
         
         return deleted
+    
+    # ========================================================================
+    # FEEDBACK METHODS (Ticket 026)
+    # ========================================================================
+    
+    def add_feedback(
+        self,
+        user_id: str,
+        date: str,
+        had_migraine: bool,
+        severity: Optional[int] = None,
+        predicted_prob: Optional[float] = None,
+        notes: Optional[str] = None
+    ) -> int:
+        """
+        Record user feedback on migraine outcome.
+        
+        Args:
+            user_id: User identifier
+            date: Date in ISO format (YYYY-MM-DD)
+            had_migraine: Whether migraine occurred
+            severity: Migraine severity (1-10) if migraine occurred
+            predicted_prob: Previously predicted probability
+            notes: Optional user notes
+            
+        Returns:
+            Feedback record ID
+        """
+        timestamp = int(datetime.utcnow().timestamp())
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_feedback
+                (user_id, feedback_date, actual_outcome, severity, predicted_risk, timestamp, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, date, int(had_migraine), severity, predicted_prob, timestamp, notes))
+            conn.commit()
+            feedback_id = cursor.lastrowid
+        
+        logger.info(f"Added feedback for user {user_id} on {date}: migraine={had_migraine}")
+        return feedback_id
+    
+    def get_user_feedback_history(
+        self,
+        user_id: str,
+        limit: int = 30
+    ) -> list:
+        """
+        Retrieve recent feedback for a user.
+        
+        Args:
+            user_id: User identifier
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of feedback records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT feedback_date, predicted_risk, actual_outcome, severity, notes, timestamp
+                FROM user_feedback
+                WHERE user_id = ?
+                ORDER BY feedback_date DESC
+                LIMIT ?
+            """, (user_id, limit))
+            
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    def get_user_accuracy(
+        self,
+        user_id: str,
+        window_days: int = 30
+    ) -> Dict:
+        """
+        Calculate user's prediction accuracy over recent window.
+        
+        Args:
+            user_id: User identifier
+            window_days: Number of days to look back
+            
+        Returns:
+            Dict with 'accuracy' and 'num_predictions'
+        """
+        cutoff_timestamp = int((datetime.utcnow().timestamp() - window_days * 86400))
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    AVG(CASE 
+                        WHEN (predicted_risk > 0.5 AND actual_outcome = 1) OR
+                             (predicted_risk <= 0.5 AND actual_outcome = 0)
+                        THEN 1.0 ELSE 0.0 
+                    END) as accuracy,
+                    COUNT(*) as num_predictions
+                FROM user_feedback
+                WHERE user_id = ?
+                AND timestamp >= ?
+                AND predicted_risk IS NOT NULL
+            """, (user_id, cutoff_timestamp))
+            
+            result = cursor.fetchone()
+            
+            return {
+                'accuracy': result[0] if result[0] else 0.0,
+                'num_predictions': result[1] if result else 0
+            }
 
 
 # Global database instance
