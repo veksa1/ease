@@ -21,10 +21,17 @@ import { useRiskPrediction } from './hooks/useDemoData';
 import { RiskVariable } from './types';
 import { OnboardingPersonalDetailsStep } from './components/OnboardingPersonalDetailsStep';
 import type { PersonalMigraineProfile } from './types';
+import { ChecklistPanel } from './components/ChecklistPanel';
 
 export default function App() {
   const [lowStimulationMode, setLowStimulationMode] = useState(false);
   const [sootheModeData, setSootheModeData] = useState<{ riskVariables: RiskVariable[], riskPercentage: number } | null>(null);
+  const [checklistContext, setChecklistContext] = useState<{
+    riskVariables: RiskVariable[];
+    riskPercentage: number;
+    riskLevel: 'low' | 'moderate' | 'high';
+  } | null>(null);
+  const [showChecklistPanel, setShowChecklistPanel] = useState(false);
   
   // Check if user has seen onboarding
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
@@ -140,7 +147,7 @@ export default function App() {
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-card border border-border" style={{ borderRadius: '12px' }}>
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <Activity className="w-5 h-5 text-primary" />
                     </div>
                     <div className="flex-1 space-y-1">
@@ -154,7 +161,7 @@ export default function App() {
 
                 <div className="p-4 rounded-xl bg-card border border-border" style={{ borderRadius: '12px' }}>
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
                       <Heart className="w-5 h-5 text-accent" />
                     </div>
                     <div className="flex-1 space-y-1">
@@ -168,7 +175,7 @@ export default function App() {
 
                 <div className="p-4 rounded-xl bg-card border border-border" style={{ borderRadius: '12px' }}>
                   <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
                       <Moon className="w-5 h-5 text-success" />
                     </div>
                     <div className="flex-1 space-y-1">
@@ -413,7 +420,7 @@ export default function App() {
               style={{ borderRadius: '12px' }}
             >
               <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
                   <Activity className="w-5 h-5 text-accent" />
                 </div>
                 <div className="flex-1 space-y-1">
@@ -583,6 +590,10 @@ export default function App() {
               setCurrentScreen('soothe-mode');
             }}
             lowStimulationMode={lowStimulationMode}
+            onChecklistRequested={(context) => {
+              setChecklistContext(context);
+              setShowChecklistPanel(true);
+            }}
           />
           <BottomNav
             activeTab="home"
@@ -601,12 +612,28 @@ export default function App() {
               setCurrentScreen('soothe-mode');
             }}
             lowStimulationMode={true}
+            onChecklistRequested={(context) => {
+              setChecklistContext(context);
+              setShowChecklistPanel(true);
+            }}
           />
           <BottomNav
             activeTab="home"
             onNavigate={(tab) => setCurrentScreen(tab)}
           />
         </>
+      )}
+
+      {showChecklistPanel && checklistContext && (
+        <ChecklistPanel
+          riskVariables={checklistContext.riskVariables}
+          riskPercentage={checklistContext.riskPercentage}
+          riskLevel={checklistContext.riskLevel}
+          onClose={() => {
+            setShowChecklistPanel(false);
+            setChecklistContext(null);
+          }}
+        />
       )}
     </div>
   );

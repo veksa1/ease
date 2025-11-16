@@ -19,6 +19,11 @@ interface HomeScreenContainerProps {
   onInsightsClick?: () => void;
   onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
   lowStimulationMode?: boolean;
+  onChecklistRequested?: (context: {
+    riskVariables: RiskVariable[];
+    riskPercentage: number;
+    riskLevel: 'low' | 'moderate' | 'high';
+  }) => void;
 }
 
 export function HomeScreenContainer({
@@ -26,6 +31,7 @@ export function HomeScreenContainer({
   onInsightsClick,
   onSootheModeClick,
   lowStimulationMode = false,
+  onChecklistRequested,
 }: HomeScreenContainerProps) {
   // Get live risk prediction
   const { loading, risk, bounds, isBackendConnected } = useRiskPrediction();
@@ -142,6 +148,11 @@ export function HomeScreenContainer({
       onQuickCheckClick={onQuickCheckClick}
       onInsightsClick={onInsightsClick}
       onSootheModeClick={onSootheModeClick}
+      onChecklistClick={
+        onChecklistRequested
+          ? () => onChecklistRequested({ riskVariables, riskPercentage, riskLevel })
+          : undefined
+      }
       lowStimulationMode={lowStimulationMode}
     />
   );

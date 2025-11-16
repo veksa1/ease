@@ -360,32 +360,10 @@ class UserFeaturesService {
    */
   private async getRecentQuickChecks(userId: string, date: Date): Promise<QuickCheckEntry[]> {
     try {
-      await sqliteService.init();
-      const db = sqliteService['db']; // Access private db instance
-      
-      if (!db) {
-        console.error('[UserFeaturesService] Database not initialized');
-        return [];
-      }
-      
-      const query = `
-        SELECT timestamp, data FROM user_timeline
-        WHERE user_id = ?
-          AND type = 'quick_check'
-          AND date(timestamp) >= date(?, '-7 days')
-        ORDER BY timestamp DESC
-        LIMIT 10
-      `;
-      
-      const results = db.exec(query, [userId, date.toISOString()]);
-      
-      if (!results || results.length === 0 || !results[0].values) {
-        return [];
-      }
-      
-      return results[0].values.map((row: any) => ({
-        timestamp: row[0] as string,
-        data: row[1] as string,
+      const entries = await sqliteService.getRecentTimelineEntriesByType('quick_check', 10);
+      return entries.map(entry => ({
+        timestamp: entry.timestamp,
+        data: JSON.stringify(entry.data ?? {}),
       }));
     } catch (error) {
       console.error('[UserFeaturesService] Error fetching Quick Checks:', error);

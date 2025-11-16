@@ -3,27 +3,68 @@
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
   import { createRealtimeSession } from './server/createRealtimeSession';
+  import { generateChecklist } from './server/generateChecklist';
 
-  const realtimeSessionProxy = (): Plugin => ({
-    name: 'voice-intake-realtime-session-proxy',
+  async function readRequestBody(req: any): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      let data = '';
+      req.on('data', (chunk: Buffer) => {
+        data += chunk.toString();
+      });
+      req.on('end', () => resolve(data));
+      req.on('error', reject);
+    });
+  }
+
+  const apiProxyPlugin = (): Plugin => ({
+    name: 'ease-api-proxy',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith('/api/openai-realtime-session')) {
+        if (!req.url?.startsWith('/api/')) {
           return next();
         }
 
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.setHeader('Allow', 'POST');
+        if (req.url.startsWith('/api/openai-realtime-session')) {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.setHeader('Allow', 'POST');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ message: 'Method Not Allowed' }));
+            return;
+          }
+
+          const { status, body } = await createRealtimeSession();
+          res.statusCode = status;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ message: 'Method Not Allowed' }));
+          res.end(JSON.stringify(body));
           return;
         }
 
-        const { status, body } = await createRealtimeSession();
-        res.statusCode = status;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(body));
+        if (req.url.startsWith('/api/checklist')) {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.setHeader('Allow', 'POST');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ message: 'Method Not Allowed' }));
+            return;
+          }
+
+          try {
+            const bodyText = await readRequestBody(req);
+            const body = bodyText ? JSON.parse(bodyText) : {};
+            const { status, body: responseBody } = await generateChecklist(body);
+            res.statusCode = status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(responseBody));
+          } catch (error) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ message: 'Checklist proxy failed', details: error instanceof Error ? error.message : 'Unknown error' }));
+          }
+          return;
+        }
+
+        return next();
       });
     },
   });
@@ -33,7 +74,7 @@
     Object.assign(process.env, env);
 
     return {
-      plugins: [realtimeSessionProxy(), react()],
+      plugins: [apiProxyPlugin(), react()],
       resolve: {
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
         alias: {
