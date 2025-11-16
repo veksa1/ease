@@ -33,11 +33,12 @@ Predict, understand, and reduce migraine risk. EASE shows your risk for today, e
 
 ## Neural Network (ALINE)
 
-- The ALINE neural network predicts the propobilities to get migrane, by using base indicators and learning personal patterns
+- The ALINE predicts the probabilities to get migraine, by using base indicators and learning personal patterns.
 - The network always updates itself when new information is presented
 - Input: 35 variables (sleep, alcohol consumption, weather...)
-- Output: propobility of migraine
-
+- Output: probability of migraine
+### Synthetic data and latent variables
+By using prior distributions from clinical studies, we were able to fit a hidden markov model in a continuous statespace to the features. This allowed us to sample time-series evolution of the migraine probability. By having a synthetic simulator allowed us to pre-train the ALINE on our task. 
 Correlation matrix: ![alt text](images/correlation_heatmap.png)
 Latent variable distribution: ![alt text](images/latent_distributions.png)
 Migraine propobility vs latent variables: ![alt text](images/risk_scatter.png)
@@ -45,7 +46,7 @@ Variable statistic summary: ![alt text](images/summary_table.png)
 Latent variable temporal evolution: ![alt text](images/temporal_evolution.png)
 Feature distribution: ![alt text](images/feature_distributions_grid.png)
 
-ALINE: https://arxiv.org/abs/2506.07259,
+ALINE (research paper): https://arxiv.org/abs/2506.07259,
 
 ## Data
 
