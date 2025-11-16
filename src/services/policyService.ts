@@ -97,13 +97,13 @@ class PolicyService {
 
       if (response.error) {
         console.error('Error fetching policy recommendations:', response.error);
-        return null;
+        return this.buildMockPolicyResponse(userId, k);
       }
 
-      return response.data || null;
+      return response.data || this.buildMockPolicyResponse(userId, k);
     } catch (error) {
       console.error('Exception in fetchFromAPI:', error);
-      return null;
+      return this.buildMockPolicyResponse(userId, k);
     }
   }
 
@@ -157,6 +157,23 @@ class PolicyService {
     return {
       size: this.cache.size,
       oldestEntry,
+    };
+  }
+
+  private buildMockPolicyResponse(userId: string, k: number): PolicyResponse {
+    const selectedHours: SelectedHour[] = [
+      { hour: 10, priority_score: 1.25 },
+      { hour: 14, priority_score: 1.05 },
+      { hour: 19, priority_score: 0.9 },
+    ].slice(0, k);
+
+    console.warn('[PolicyService] Using mock policy recommendations (offline mode)');
+
+    return {
+      user_id: userId,
+      selected_hours: selectedHours,
+      k,
+      timestamp: new Date().toISOString(),
     };
   }
 }

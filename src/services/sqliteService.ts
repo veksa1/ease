@@ -412,6 +412,27 @@ class SQLiteService {
   }
 
   /**
+   * Get the most recent timeline entries for a specific type
+   */
+  async getRecentTimelineEntriesByType(type: string, limit: number = 5): Promise<any[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 50));
+    const results = await this.query(
+      `SELECT type, data, timestamp
+       FROM timeline_entries
+       WHERE type = ?
+       ORDER BY timestamp DESC
+       LIMIT ${safeLimit}`,
+      [type]
+    );
+
+    return results.map(row => ({
+      type: row.type,
+      data: JSON.parse(row.data),
+      timestamp: row.timestamp
+    }));
+  }
+
+  /**
    * Clear all timeline entries
    */
   async clearTimeline(): Promise<void> {
@@ -494,6 +515,22 @@ class SQLiteService {
   }
 
   /**
+   * Get raw experiment entries for aggregation/analytics
+   */
+  async getAllExperimentEntries(): Promise<Array<{ experimentName: string; dayIndex: number; completed: boolean; timestamp: string }>> {
+    const rows = await this.query(
+      'SELECT experiment_name, day_index, completed, timestamp FROM experiments ORDER BY timestamp DESC'
+    );
+
+    return rows.map(row => ({
+      experimentName: row.experiment_name,
+      dayIndex: row.day_index,
+      completed: row.completed === 1,
+      timestamp: row.timestamp,
+    }));
+  }
+
+  /**
    * Clear all experiments
    */
   async clearExperiments(): Promise<void> {
@@ -535,6 +572,35 @@ class SQLiteService {
     );
 
     await this.saveToIndexedDB();
+  }
+
+  /**
+   * Get recent soothe mode sessions for context building
+   */
+  async getRecentSootheModeSessions(limit: number = 5): Promise<Array<{
+    id: string;
+    startedAt: string;
+    durationMinutes: number;
+    completedInstructionIds: string[];
+    triggerLabels: string;
+    outcome?: string | null;
+  }>> {
+    const safeLimit = Math.max(1, Math.min(limit, 20));
+    const rows = await this.query(
+      `SELECT id, started_at, duration_minutes, completed_instruction_ids, trigger_labels, outcome
+       FROM soothemode_sessions
+       ORDER BY started_at DESC
+       LIMIT ${safeLimit}`
+    );
+
+    return rows.map(row => ({
+      id: row.id,
+      startedAt: row.started_at,
+      durationMinutes: row.duration_minutes,
+      completedInstructionIds: JSON.parse(row.completed_instruction_ids || '[]'),
+      triggerLabels: row.trigger_labels,
+      outcome: row.outcome,
+    }));
   }
 
   /**

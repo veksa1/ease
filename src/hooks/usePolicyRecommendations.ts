@@ -5,9 +5,13 @@
  * Fetches real user data internally via userFeaturesService.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { policyService, type PolicyResponse } from '../services/policyService';
 import { userFeaturesService } from '../services/userFeaturesService';
+
+const RETRY_DELAYS_MS = [0, 1000, 2000, 5000, 10000];
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface UsePolicyRecommendationsOptions {
   userId: string;
@@ -18,7 +22,7 @@ interface UsePolicyRecommendationsOptions {
 
 export function usePolicyRecommendations({
   userId,
-  date = new Date(),
+  date,
   k = 3,
   enabled = true,
 }: UsePolicyRecommendationsOptions) {
@@ -27,47 +31,76 @@ export function usePolicyRecommendations({
   const [error, setError] = useState<string | null>(null);
   const [featureCoverage, setFeatureCoverage] = useState<number>(0);
 
+  const dateKey = date ? date.toISOString() : 'today';
+  const resolvedDate = useMemo(() => date ?? new Date(), [dateKey]);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const fetchRecommendations = useCallback(async () => {
     if (!enabled) return;
 
     setLoading(true);
     setError(null);
 
-    try {
-      // Build real user features (no more mock data!)
-      const features = await userFeaturesService.get24HourFeatures({
-        userId,
-        date,
-        includeCalendar: true,
-        includeWeather: true,
-      });
+    let lastError: string | null = null;
 
-      // Validate before sending to API
-      const validation = userFeaturesService.validateFeatures(features);
-      if (!validation.valid) {
-        setError(`Invalid features: ${validation.errors.join(', ')}`);
+    for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+      if (!isMounted.current || !enabled) {
         setLoading(false);
         return;
       }
 
-      // Calculate feature coverage (simplified - just check non-defaults)
-      // In a real implementation, this would be returned by userFeaturesService
-      setFeatureCoverage(0.6); // Placeholder
-
-      const policy = await policyService.getTopKHours(userId, features, k);
-
-      if (policy) {
-        setRecommendations(policy);
-      } else {
-        setError('Failed to fetch recommendations');
+      if (attempt > 0) {
+        await sleep(RETRY_DELAYS_MS[attempt]);
+        if (!isMounted.current || !enabled) {
+          setLoading(false);
+          return;
+        }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      console.error('[usePolicyRecommendations] Error:', err);
+
+      try {
+        const features = await userFeaturesService.get24HourFeatures({
+          userId,
+          date: resolvedDate,
+          includeCalendar: true,
+          includeWeather: true,
+        });
+
+        const validation = userFeaturesService.validateFeatures(features);
+        if (!validation.valid) {
+          lastError = `Invalid features: ${validation.errors.join(', ')}`;
+          console.error('[usePolicyRecommendations] Validation failed:', validation.errors);
+          continue;
+        }
+
+        setFeatureCoverage(0.6);
+
+        const policy = await policyService.getTopKHours(userId, features, k);
+
+        if (policy) {
+          if (!isMounted.current) return;
+          setRecommendations(policy);
+          setLoading(false);
+          return;
+        }
+
+        lastError = 'Failed to fetch recommendations';
+        console.warn('[usePolicyRecommendations] Empty policy response, retrying...');
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`[usePolicyRecommendations] Attempt ${attempt + 1} failed:`, err);
+      }
     }
 
+    if (!isMounted.current) return;
+    setError(lastError ?? 'Failed to fetch recommendations after multiple attempts');
     setLoading(false);
-  }, [userId, date, k, enabled]);
+  }, [userId, resolvedDate, k, enabled]);
 
   useEffect(() => {
     fetchRecommendations();

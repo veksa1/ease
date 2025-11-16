@@ -11,6 +11,7 @@ import {
   Flame,
   HelpCircle,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { RiskRing } from './RiskRing';
 import { RiskHeroCard } from './RiskHeroCard';
@@ -65,6 +66,7 @@ interface HomeScreenProps {
   onQuickCheckClick?: () => void;
   onInsightsClick?: () => void;
   onSootheModeClick?: (riskVariables: RiskVariable[], riskPercentage: number) => void;
+  onChecklistClick?: () => void;
   showNotification?: 'alert' | 'nudge' | null;
   lowStimulationMode?: boolean;
 }
@@ -83,6 +85,7 @@ export function HomeScreen({
   onQuickCheckClick,
   onInsightsClick,
   onSootheModeClick,
+  onChecklistClick,
   showNotification = null,
   lowStimulationMode = false,
 }: HomeScreenProps) {
@@ -94,19 +97,19 @@ export function HomeScreen({
   const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
   const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
   
-  // Policy recommendations for smart measurement nudges
+  // Policy recommendations for smart measurement nudges (only after checklist request)
   const [showSmartMeasurement, setShowSmartMeasurement] = React.useState(false);
   const { recommendations, loading: policyLoading } = usePolicyRecommendations({
     userId: 'demo-user',
     enabled: showSmartMeasurement,
   });
-  
-  // Show smart measurement card after user interacts with Quick Check
-  React.useEffect(() => {
-    // Auto-enable on mount to show recommendations
-    const timer = setTimeout(() => setShowSmartMeasurement(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+
+  const handleChecklistClick = React.useCallback(() => {
+    setShowSmartMeasurement(true);
+    if (onChecklistClick) {
+      onChecklistClick();
+    }
+  }, [onChecklistClick]);
   
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -241,6 +244,32 @@ export function HomeScreen({
               )}
             </Button>
           </div>
+
+          {onChecklistClick && (
+            <div
+              className="p-5 rounded-xl border border-border bg-linear-to-r from-primary/10 via-accent/10 to-background"
+              style={{ borderRadius: '16px' }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className="text-body font-medium">Need a plan for the next few hours?</p>
+                  <p className="text-label text-muted-foreground">
+                    Let GPT-4o assemble steps from your latest data, calendar load, and streak.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleChecklistClick}
+                className="w-full h-11 mt-4"
+                style={{ borderRadius: '12px' }}
+              >
+                Generate AI checklist
+              </Button>
+            </div>
+          )}
 
           {/* Today at a Glance */}
           <div
