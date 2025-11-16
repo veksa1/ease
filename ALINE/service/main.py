@@ -154,11 +154,20 @@ async def lifespan(app: FastAPI):
     port = os.getenv('PORT', '8080')
     host = os.getenv('HOST', '0.0.0.0')
     logger.info(f"Starting ALINE service on {host}:{port}")
+    
+    # Don't load model at startup - load on first request for faster startup
+    # This is critical for Cloud Run which has strict startup timeout
+    logger.info("Service starting - model will be loaded on first request")
+    
+    # Just load the config
     try:
-        load_model_and_config()
-        logger.info("✓ Startup completed successfully")
+        config_path = Path(__file__).parent.parent / 'configs' / 'service.yaml'
+        with open(config_path) as f:
+            service_config = yaml.safe_load(f)
+        app_state['config'] = service_config
+        logger.info("✓ Configuration loaded successfully")
     except Exception as e:
-        logger.error(f"✗ Startup failed: {e}", exc_info=True)
+        logger.error(f"✗ Failed to load config: {e}", exc_info=True)
         raise
     
     yield
@@ -187,9 +196,17 @@ app.add_middleware(
 )
 
 
+def ensure_model_loaded():
+    """Lazy load model on first request"""
+    if not app_state['model_loaded']:
+        logger.info("Loading model on first request...")
+        load_model_and_config()
+        logger.info("✓ Model loaded successfully")
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Health check endpoint"""
+    """Health check endpoint - doesn't require model to be loaded"""
     return HealthResponse(
         status="ok",
         timestamp=datetime.now().isoformat(),
@@ -204,6 +221,9 @@ async def risk_daily(request: DailyRiskRequest):
     
     Returns mean probability and 90% confidence interval.
     """
+    # Lazy load model on first request
+    ensure_model_loaded()
+    
     if not app_state['model_loaded']:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
@@ -256,6 +276,9 @@ async def posterior_hourly(request: PosteriorRequest):
     
     Returns mean and std for each hour.
     """
+    # Lazy load model on first request
+    ensure_model_loaded()
+    
     if not app_state['model_loaded']:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
@@ -306,6 +329,9 @@ async def policy_topk(request: PolicyRequest):
     
     Uses uncertainty and impact to select most informative hours.
     """
+    # Lazy load model on first request
+    ensure_model_loaded()
+    
     if not app_state['model_loaded']:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
