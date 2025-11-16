@@ -38,12 +38,12 @@ Predict, understand, and reduce migraine risk. EASE shows your risk for today, e
 - Input: 35 variables (sleep, alcohol consumption, weather...)
 - Output: propobility of migraine
 
-Correlation matrix: ![alt text](correlation_heatmap.png)
-Latent variable distribution: ![alt text](latent_distributions.png)
-Migraine propobility vs latent variables: ![alt text](risk_scatter.png)
-Variable statistic summary: ![alt text](summary_table.png)
-Latent variable temporal evolution: ![alt text](temporal_evolution.png)
-Feature distribution: ![alt text](feature_distributions_grid.png)
+Correlation matrix: ![alt text](images/correlation_heatmap.png)
+Latent variable distribution: ![alt text](images/latent_distributions.png)
+Migraine propobility vs latent variables: ![alt text](images/risk_scatter.png)
+Variable statistic summary: ![alt text](images/summary_table.png)
+Latent variable temporal evolution: ![alt text](images/temporal_evolution.png)
+Feature distribution: ![alt text](images/feature_distributions_grid.png)
 
 ## Data
 
@@ -63,5 +63,5 @@ Feature distribution: ![alt text](feature_distributions_grid.png)
 
 ## Visual
 
-main page: ![alt text](image-2.png)
-personalized plan: ![alt text](image-3.png)
+main page: ![alt text](images/image-2.png)
+personalized plan: ![alt text](images/image-3.png)
