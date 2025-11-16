@@ -90,6 +90,7 @@ const MIGRAINE_TOOL_SCHEMA = {
 
 const AUDIO_POST_BUFFER_GRACE_MS = 600;
 const AUDIO_FALLBACK_TIMEOUT_MS = 3000;
+const AUDIO_COMPLETION_FAILSAFE_MS = 8000;
 const COMPLETION_TRANSITION_DELAY_MS = 1200;
 
 type AssistantStatus =
@@ -258,6 +259,21 @@ export function VoiceMigraineAssistant({
     [teardownSession]
   );
 
+  const startAudioCompletionFallback = useCallback(
+    (timeoutMs: number) => {
+      if (audioFallbackTimeoutRef.current) {
+        clearTimeout(audioFallbackTimeoutRef.current);
+      }
+      audioFallbackTimeoutRef.current = setTimeout(() => {
+        audioFallbackTimeoutRef.current = null;
+        if (!pendingTeardownAfterAudio.current) return;
+        pendingTeardownAfterAudio.current = false;
+        scheduleTeardownAfterAudio(AUDIO_POST_BUFFER_GRACE_MS);
+      }, timeoutMs);
+    },
+    [scheduleTeardownAfterAudio]
+  );
+
   const saveReport = useCallback(
     async (
       override?: MigraineReportFormData,
@@ -281,6 +297,7 @@ export function VoiceMigraineAssistant({
         if (delayTeardown) {
           clearAudioCompletionTimers();
           pendingTeardownAfterAudio.current = true;
+          startAudioCompletionFallback(AUDIO_COMPLETION_FAILSAFE_MS);
         } else {
           teardownSession();
         }
@@ -292,7 +309,7 @@ export function VoiceMigraineAssistant({
         setIsSaving(false);
       }
     },
-    [structuredReport, collectedData, teardownSession, clearAudioCompletionTimers]
+    [structuredReport, collectedData, teardownSession, clearAudioCompletionTimers, startAudioCompletionFallback]
   );
 
   const handleFunctionCall = useCallback(
@@ -311,17 +328,27 @@ export function VoiceMigraineAssistant({
 
       const callId =
         functionPart?.call_id ?? functionPart?.function?.call_id ?? functionPart?.id ?? '';
-      if (callId && processedFunctionCallIds.current.has(callId)) {
-        console.debug('[VoiceAssistant] Ignoring duplicate function call', callId);
-        return;
-      }
-      if (callId) {
-        processedFunctionCallIds.current.add(callId);
-      }
-
       try {
-        const argsPayload = functionPart?.arguments ?? functionPart?.function?.arguments;
-        const args = argsPayload ? JSON.parse(argsPayload) : {};
+        if (callId && processedFunctionCallIds.current.has(callId)) {
+          console.debug('[VoiceAssistant] Ignoring duplicate function call', callId);
+          return;
+        }
+
+        const rawArgs =
+          functionPart?.arguments ?? functionPart?.function?.arguments ?? functionPart?.payload;
+        const serializedArgs =
+          typeof rawArgs === 'string'
+            ? rawArgs
+            : rawArgs
+            ? JSON.stringify(rawArgs)
+            : '';
+
+        if (!serializedArgs || !serializedArgs.trim()) {
+          console.debug('[VoiceAssistant] Function call arguments incomplete, waiting for final chunk');
+          return;
+        }
+
+        const args = JSON.parse(serializedArgs);
         const normalized = mapVoicePayloadToFormData(args, collectedData);
 
         setCollectedData(normalized);
@@ -329,6 +356,9 @@ export function VoiceMigraineAssistant({
         setStatus('summary');
 
         await saveReport(normalized, { delayTeardown: true });
+        if (callId) {
+          processedFunctionCallIds.current.add(callId);
+        }
 
         if (callId) {
           dataChannelRef.current?.send(
@@ -469,13 +499,8 @@ export function VoiceMigraineAssistant({
           break;
         }
         case 'response.audio.done': {
-          if (pendingTeardownAfterAudio.current && !audioFallbackTimeoutRef.current) {
-            audioFallbackTimeoutRef.current = setTimeout(() => {
-              audioFallbackTimeoutRef.current = null;
-              if (!pendingTeardownAfterAudio.current) return;
-              pendingTeardownAfterAudio.current = false;
-              scheduleTeardownAfterAudio(AUDIO_POST_BUFFER_GRACE_MS);
-            }, AUDIO_FALLBACK_TIMEOUT_MS);
+          if (pendingTeardownAfterAudio.current) {
+            startAudioCompletionFallback(AUDIO_FALLBACK_TIMEOUT_MS);
           }
           break;
         }

@@ -17,8 +17,8 @@ COPY pyproject.toml uv.lock* ./
 # Install uv package manager
 RUN pip install --no-cache-dir uv
 
-# Install Python dependencies
-RUN uv sync --frozen
+# Install Python dependencies using uv
+RUN uv sync --frozen --no-dev
 
 # Copy application code
 COPY models/ ./models/
@@ -37,13 +37,11 @@ RUN mkdir -p /app/runs/checkpoints
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
+ENV PYTHONPATH=/app
 
 # Expose port
 EXPOSE 8080
 
-# Health check with extended timeout for model loading
-HEALTHCHECK --interval=30s --timeout=60s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
-
-# Run the FastAPI service using uv to ensure correct Python environment
-CMD ["uv", "run", "python", "-m", "service.main"]
+# Run the FastAPI service directly with uvicorn
+# Cloud Run requires the app to listen on 0.0.0.0:$PORT
+CMD exec uvicorn service.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1

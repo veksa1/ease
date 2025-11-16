@@ -268,7 +268,7 @@ export function DayDetailsScreen({ date, dayNumber, onBack, onExportPDF }: DayDe
                 <span>0%</span>
               </div>
               <div className="flex-1 overflow-hidden max-w-full" style={{ aspectRatio: '280/120' }}>
-                {loadingHourlyRisk ? (
+                {loading ? (
                   <div className="flex items-center justify-center h-full">
                     <p className="text-label text-muted-foreground">Loading hourly predictions...</p>
                   </div>

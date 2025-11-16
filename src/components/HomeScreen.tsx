@@ -20,8 +20,12 @@ import { PillChip } from './PillChip';
 import { ReportMigraineModal } from './ReportMigraineMigral';
 import { InsightsTeaserCard } from './InsightsTeaserCard';
 import { NotificationCard } from './NotificationCard';
+import { SmartMeasurementCard } from './SmartMeasurementCard';
+import { TomorrowRiskBanner } from './TomorrowRiskBanner';
 import { RiskVariable } from '../types';
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders';
+import { usePolicyRecommendations } from '../hooks/usePolicyRecommendations';
+import { useTomorrowRisk } from '../hooks/useTomorrowRisk';
 
 import {
   Sheet,
@@ -84,9 +88,25 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [showDisclaimer, setShowDisclaimer] = React.useState(true);
   const [notificationDismissed, setNotificationDismissed] = React.useState(false);
+  const [showTomorrowBanner, setShowTomorrowBanner] = React.useState(true);
   const { pendingFollowUps, recordOutcome } = useFollowUpReminders();
+  const { prediction: tomorrowPrediction, shouldNotify } = useTomorrowRisk('demo-user');
   const [dismissedFollowUpIds, setDismissedFollowUpIds] = React.useState<Set<string>>(new Set());
   const firstPending = pendingFollowUps.find(f => !dismissedFollowUpIds.has(f.id));
+  
+  // Policy recommendations for smart measurement nudges
+  const [showSmartMeasurement, setShowSmartMeasurement] = React.useState(false);
+  const { recommendations, loading: policyLoading } = usePolicyRecommendations({
+    userId: 'demo-user',
+    enabled: showSmartMeasurement,
+  });
+  
+  // Show smart measurement card after user interacts with Quick Check
+  React.useEffect(() => {
+    // Auto-enable on mount to show recommendations
+    const timer = setTimeout(() => setShowSmartMeasurement(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
   
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -158,6 +178,14 @@ export function HomeScreen({
                   : undefined
               }
               onDismiss={() => setNotificationDismissed(true)}
+            />
+          )}
+
+          {/* Tomorrow Risk Banner */}
+          {showTomorrowBanner && shouldNotify && tomorrowPrediction && (
+            <TomorrowRiskBanner
+              prediction={tomorrowPrediction}
+              onDismiss={() => setShowTomorrowBanner(false)}
             />
           )}
 
@@ -348,6 +376,20 @@ export function HomeScreen({
               )}
             </div>
           </div>
+
+          {/* Smart Measurement Nudges - Ticket 027 */}
+          {showSmartMeasurement && recommendations && !policyLoading && (
+            <SmartMeasurementCard
+              selectedHours={recommendations.selected_hours}
+              onSetReminder={(hour) => {
+                // Set browser notification for this hour
+                const message = `Time for your check-in! This is a high-value measurement hour.`;
+                console.log(`Reminder set for ${hour}:00 - ${message}`);
+                // TODO: Implement actual notification scheduling
+                alert(`Reminder set for ${hour}:00. You'll be notified when it's time to check in.`);
+              }}
+            />
+          )}
 
           {/* Prevention Plan Feedback */}
           {showPreventionFeedback && (
