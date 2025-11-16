@@ -309,7 +309,7 @@ def train_epoch(model, dataloader, optimizer, device, config):
         
         # Check for extreme loss before backward pass
         loss_val = loss.item()
-        if torch.isnan(loss) or torch.isinf(loss) or loss_val > 1000.0:
+        if torch.isnan(loss) or torch.isinf(loss) or loss_val > 100.0:
             logger.warning(f"Extreme/invalid loss detected: {loss_val:.2e} at batch {batch_idx}. Skipping batch.")
             logger.debug(f"  posterior_loss={loss_post.item():.2e}, policy_loss={loss_policy.item():.2e}, migraine_loss={loss_migraine.item():.2e}")
             continue

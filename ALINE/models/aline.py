@@ -96,10 +96,18 @@ class SimpleALINE(nn.Module):
         stats = self.post_head(h)  # [B, T, 2*z_dim]
         mu, logsig = stats.chunk(2, dim=-1)  # Each: [B, T, z_dim]
         
+        # Clamp mu to reasonable range (latent values should be roughly [-10, 10])
+        mu = torch.clamp(mu, min=-10.0, max=10.0)
+        
+        # Clamp log-std to prevent explosion: exp(-5) = 0.007, exp(2) = 7.4
+        # This keeps std in a reasonable range [0.007, 7.4]
+        logsig = torch.clamp(logsig, min=-5.0, max=2.0)
+        
         # Create Normal distribution (exp to get std from log-std)
         posterior = Normal(mu, logsig.exp())
         
-        # Policy head: compute query scores
+        # Policy head: compute query scores (clamp to prevent extreme values)
         pol = self.policy_head(h).squeeze(-1)  # [B, T]
+        pol = torch.clamp(pol, min=-10.0, max=10.0)
         
         return posterior, pol
