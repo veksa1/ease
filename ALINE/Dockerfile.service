@@ -1,47 +1,39 @@
-# Production Dockerfile for ALINE FastAPI Service
-# Optimized for Google Cloud Run deployment
-
 FROM python:3.12-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Python environment hygiene
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# OS deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
-COPY pyproject.toml uv.lock* ./
+# ---- Create & activate venv ----
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install uv package manager
-RUN pip install --no-cache-dir uv
-
-# Install Python dependencies using uv
-RUN uv sync --frozen --no-dev
-
-# Copy application code
+# ---- Install project dependencies ----
+# Copy metadata first (improves cache) then copy source and required folders.
+# Avoid copying optional runtime artifacts (like specific checkpoints) which
+# may not exist at build time — mount those at runtime instead.
+COPY pyproject.toml ./
 COPY models/ ./models/
 COPY service/ ./service/
 COPY configs/ ./configs/
+# Copy remaining project files
+COPY . .
 
-# Copy model checkpoint
-COPY runs/checkpoints/best.pt ./runs/checkpoints/best.pt
+# Install the package
+RUN pip install --no-cache-dir .
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data
+# Prepare runtime dirs
+RUN mkdir -p /app/data /app/runs/checkpoints
 
-# Create runs directory for model checkpoints
-RUN mkdir -p /app/runs/checkpoints
-
-# Environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
-ENV PYTHONPATH=/app
-
-# Expose port
 EXPOSE 8080
 
-# Run the FastAPI service directly with uvicorn
-# Cloud Run requires the app to listen on 0.0.0.0:$PORT
-CMD exec uvicorn service.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1
+CMD ["uvicorn", "service.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
