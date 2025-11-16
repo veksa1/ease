@@ -9,6 +9,7 @@ import { calendarService } from './calendarService';
 import { userFeaturesService } from './userFeaturesService';
 import { riskPredictionService } from './riskPredictionService';
 import { locationContextService, type LocationContextResponse } from './locationContextService';
+import { demoDataService } from './demoDataService';
 
 export interface TomorrowRiskBreakdown {
   totalRisk: number;
@@ -206,6 +207,7 @@ class TomorrowPredictionService {
       );
 
       if (!riskPrediction) {
+        console.log('[TomorrowPredictionService] Local calendar prediction failed, using baseline');
         return this.getBaselineTomorrowRisk(userId);
       }
 
@@ -247,7 +249,27 @@ class TomorrowPredictionService {
 
       const prediction = await riskPredictionService.getDailyRisk(userId, features);
 
-      if (!prediction) return null;
+      if (!prediction) {
+        // Backend failed, use demo data
+        console.log('[TomorrowPredictionService] Backend unavailable, using demo data');
+        const demoRisk = demoDataService.getCurrentRisk();
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        return {
+          date: tomorrow.toISOString(),
+          risk: demoRisk.risk,
+          bounds: { lower: demoRisk.lower, upper: demoRisk.upper },
+          breakdown: {
+            totalRisk: demoRisk.risk,
+            baselineRisk: demoRisk.risk,
+            contributors: [],
+          },
+          calendarEvents: [],
+          suggestions: this.generateSuggestions(demoRisk.risk, [], null),
+          timestamp: new Date().toISOString(),
+        };
+      }
 
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);

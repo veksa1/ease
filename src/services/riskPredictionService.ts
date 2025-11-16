@@ -6,6 +6,7 @@
  */
 
 import { apiClient } from '../utils/api';
+import { getApiUrl } from '../utils/env';
 
 export interface DailyRiskRequest {
   user_id: string;
@@ -30,6 +31,23 @@ class RiskPredictionService {
    */
   async getDailyRisk(userId: string, features: number[][]): Promise<DailyRiskResponse | null> {
     try {
+      // Validate features before sending
+      if (features.length !== 24) {
+        console.error(`[RiskPredictionService] Invalid features: expected 24 hours, got ${features.length}`);
+        return null;
+      }
+      
+      const featureCounts = features.map(h => h.length);
+      const uniqueCounts = [...new Set(featureCounts)];
+      if (uniqueCounts.length !== 1 || uniqueCounts[0] !== 35) {
+        console.error(`[RiskPredictionService] Invalid feature dimensions:`, featureCounts);
+        console.error(`[RiskPredictionService] Expected all hours to have 35 features`);
+        return null;
+      }
+      
+      console.log(`[RiskPredictionService] Sending ${features.length}x${features[0].length} feature matrix to backend`);
+      console.log(`[RiskPredictionService] Backend URL: ${getApiUrl('/risk/daily')}`);
+      
       const requestBody: DailyRiskRequest = {
         user_id: userId,
         features: features,

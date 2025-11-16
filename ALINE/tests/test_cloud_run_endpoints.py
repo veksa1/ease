@@ -30,7 +30,7 @@ BASE_URL = os.getenv(
 
 # Test configuration
 TIMEOUT = 30  # seconds
-N_FEATURES = 20
+N_FEATURES = 35  # Updated to match model v2.0-35feature
 N_HOURS = 24
 
 
@@ -40,31 +40,52 @@ N_HOURS = 24
 
 @pytest.fixture
 def sample_features() -> List[List[float]]:
-    """Generate realistic 24-hour feature data"""
+    """Generate realistic 24-hour feature data with 35 features"""
+    import math
     features = []
     for hour in range(N_HOURS):
-        # Generate realistic feature values
+        # Generate realistic feature values (35 features total)
         hour_features = [
-            7.5 + (hour % 2) * 0.5,  # Sleep Duration (hours)
-            7.0 + (hour % 3),         # Sleep Quality (1-10)
-            8.0,                       # Sleep Consistency Score
-            5.0 + (hour % 4),         # Stress Level (1-10)
-            8.0 if 9 <= hour <= 17 else 0,  # Work Hours
-            4.0 + (hour % 3),         # Anxiety Score (1-10)
-            200.0 if hour in [7, 12, 15] else 0,  # Caffeine Intake (mg)
-            2.0 if hour % 3 == 0 else 0,  # Water Intake (L)
-            7.0,                       # Meal Regularity (1-10)
-            30.0 if hour == 18 else 0,  # Exercise Duration (min)
-            5.0 if hour == 18 else 2.0,  # Physical Activity Level (1-10)
-            4.0 + (hour % 3),         # Neck Tension (1-10)
-            2.0 if 9 <= hour <= 22 else 0,  # Screen Time (hours)
-            1013.25,                   # Weather Pressure (hPa)
-            60.0 if 9 <= hour <= 17 else 40.0,  # Noise Level (dB)
-            5.0,                       # Hormone Fluctuation Index
-            15.0,                      # Menstrual Cycle Day
-            0.0 if hour < 18 else 1.5,  # Alcohol Consumption (units)
-            0.0,                       # Smoking (cigarettes/day)
-            10.0 if hour == 7 else 0,  # Meditation Time (min)
+            # BASE FEATURES (0-19)
+            7.5 + (hour % 2) * 0.5,  # 0: Sleep Duration (hours)
+            7.0 + (hour % 3),         # 1: Sleep Quality (1-10)
+            8.0,                       # 2: Sleep Consistency Score
+            5.0 + (hour % 4),         # 3: Stress Level (1-10)
+            8.0 if 9 <= hour <= 17 else 0,  # 4: Work Hours
+            4.0 + (hour % 3),         # 5: Anxiety Score (1-10)
+            200.0 if hour in [7, 12, 15] else 0,  # 6: Caffeine Intake (mg)
+            2.0 if hour % 3 == 0 else 0,  # 7: Water Intake (L)
+            7.0,                       # 8: Meal Regularity (1-10)
+            30.0 if hour == 18 else 0,  # 9: Exercise Duration (min)
+            5.0 if hour == 18 else 2.0,  # 10: Physical Activity Level (1-10)
+            4.0 + (hour % 3),         # 11: Neck Tension (1-10)
+            2.0 if 9 <= hour <= 22 else 0,  # 12: Screen Time (hours)
+            1013.25,                   # 13: Weather Pressure (hPa)
+            60.0 if 9 <= hour <= 17 else 40.0,  # 14: Noise Level (dB)
+            5.0,                       # 15: Hormone Fluctuation Index
+            15.0,                      # 16: Menstrual Cycle Day
+            0.0 if hour < 18 else 1.5,  # 17: Alcohol Consumption (units)
+            0.0,                       # 18: Smoking (cigarettes/day)
+            10.0 if hour == 7 else 0,  # 19: Meditation Time (min)
+            
+            # TEMPORAL FEATURES (20-23)
+            math.sin(2 * math.pi * (hour % 7) / 7),  # 20: day_of_week_sin
+            math.cos(2 * math.pi * (hour % 7) / 7),  # 21: day_of_week_cos
+            math.sin(2 * math.pi * 45 / 52),  # 22: week_of_year_sin (week 45)
+            math.cos(2 * math.pi * 45 / 52),  # 23: week_of_year_cos
+            
+            # EXPANDED FEATURES (24-34)
+            65.0 + (hour % 5) * 2,    # 24: HRV (ms)
+            70.0 + (hour % 8),        # 25: Resting Heart Rate (bpm)
+            0.0,                       # 26: Body Temperature Change (°C)
+            0.0,                       # 27: Barometric Pressure Change (hPa)
+            50.0,                      # 28: Air Quality Index
+            100.0,                     # 29: Altitude (meters)
+            2.0 if hour < 10 else 0.0,  # 30: Prodrome Symptoms (scale)
+            35.0,                      # 31: Age (years)
+            70.0,                      # 32: Body Weight (kg)
+            22.5,                      # 33: BMI (kg/m²)
+            5.0,                       # 34: Migraine History Years
         ]
         features.append(hour_features)
     return features

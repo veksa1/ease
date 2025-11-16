@@ -262,12 +262,21 @@ async def risk_daily(request: DailyRiskRequest):
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        # Validate input
+        # Validate input shape
         if len(request.features) != 24:
             raise HTTPException(
                 status_code=400,
                 detail=f"Expected 24 hours of features, got {len(request.features)}"
             )
+        
+        # Validate feature dimension for each hour
+        expected_features = app_state['config']['model'].get('in_dim', 35) if app_state['config'] else 35
+        for i, hour_features in enumerate(request.features):
+            if len(hour_features) != expected_features:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Hour {i}: Expected {expected_features} features, got {len(hour_features)}"
+                )
         
         # Convert to tensor
         features = torch.FloatTensor(request.features).unsqueeze(0)  # [1, 24, n_features]

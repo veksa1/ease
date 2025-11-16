@@ -10,6 +10,7 @@ import { demoDataService } from '../services/demoDataService';
 import { quickCheckToRiskAdjustment, quickCheckToFeatures, type QuickCheckData } from '../services/featureConverter';
 import { riskPredictionService } from '../services/riskPredictionService';
 import { posteriorService, type HourlyPosterior } from '../services/posteriorService';
+import { userFeaturesService } from '../services/userFeaturesService';
 import type { Correlation, CalendarDay, HourlyRisk, UserTimelineEntry } from '../types/aline';
 
 /**
@@ -39,9 +40,13 @@ export function useRiskPrediction() {
         // Fetch from backend API
         const userId = 'demo-user'; // In production, get from auth context
         
-        // TODO: Replace with actual user feature data
-        // For now, using mock features for demonstration
-        const features = riskPredictionService.generateMockFeatures(20);
+        // Use real user features from userFeaturesService (35 features)
+        const features = await userFeaturesService.get24HourFeatures({
+          userId,
+          date: new Date(),
+          includeCalendar: true,
+          includeWeather: false,
+        });
         
         const prediction = await riskPredictionService.getDailyRisk(userId, features);
         
